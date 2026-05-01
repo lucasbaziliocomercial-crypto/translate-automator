@@ -91,13 +91,25 @@ jobs:
 
       - name: Package Windows
         if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win nsis --publish always
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Upload Windows assets to release
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          ASSETS=(dist-builder/*.exe dist-builder/*.exe.blockmap dist-builder/latest.yml)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "No assets found in dist-builder/"; ls -la dist-builder || true; exit 1
+          fi
+          gh release upload "${{ steps.tag.outputs.tag }}" "${ASSETS[@]}" \
+            --repo "${GITHUB_REPOSITORY}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package macOS
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac dmg zip --publish never
+        run: npx electron-builder --mac dmg zip --x64 --arm64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
