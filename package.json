@@ -2,7 +2,7 @@
   "name": "translate-automator",
   "productName": "Translate Automator",
   "version": "1.0.10",
-  "description": "Tradutor de roteiros PT-BR para EN-US com Claude Opus 4.7 e Gemini 3.1 Pro",
+  "description": "Tradutor de roteiros PT-BR para EN-US com Claude Opus 4.7",
   "main": "dist-electron/main.js",
   "author": {
     "name": "Lucas Bazilio",
@@ -27,7 +27,6 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.0",
-    "@google/genai": "^1.51.0",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-select": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.0",

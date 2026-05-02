@@ -7,15 +7,8 @@ export function ModelPicker() {
 
   useEffect(() => {
     window.translateAutomator.getSettings().then((s) => {
-      if (!s.lastModelId) return;
-      if (s.lastModelId === "claude-opus-4-7" || s.lastModelId === "gemini-3-1-pro") {
-        setModelId(s.lastModelId as ModelId);
-        return;
-      }
-      // Migra escolha antiga: "gemini-3-pro" (descontinuado) → "gemini-3-1-pro".
-      if (s.lastModelId === "gemini-3-pro") {
-        setModelId("gemini-3-1-pro");
-        window.translateAutomator.setSettings({ lastModelId: "gemini-3-1-pro" });
+      if (s.lastModelId === "claude-opus-4-7") {
+        setModelId(s.lastModelId);
       }
     });
   }, [setModelId]);

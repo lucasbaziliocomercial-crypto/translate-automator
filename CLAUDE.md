@@ -37,12 +37,13 @@ Quando importar de `electron/preload` no renderer, use caminho relativo (`../../
 
 Sem PARTE detectada → tudo vira `partResults[1]`. `joinPartResults` reordena por número ao montar o output final.
 
-### Providers
+### Provider
 
-Dois providers, mesma assinatura `AsyncGenerator<{type, text?, error?}>`, ambos recebem o MESMO `TRANSLATOR_SYSTEM_PROMPT` ([src/lib/translator-prompt.ts](src/lib/translator-prompt.ts) — 10 regras + marcadores `==...==` e `### ✦ Nome` para destaque).
+Um provider único com assinatura `AsyncGenerator<{type, text?, error?}>`, recebe o `TRANSLATOR_SYSTEM_PROMPT` ([src/lib/translator-prompt.ts](src/lib/translator-prompt.ts) — 10 regras + marcadores `==...==` e `### ✦ Nome` para destaque).
 
 - **Claude** ([electron/providers/claude-provider.ts](electron/providers/claude-provider.ts)): usa `@anthropic-ai/claude-agent-sdk`, autentica via OAuth da assinatura Claude Max (CLI `claude` instalado globalmente, credenciais em `~/.claude/.credentials.json`). Sem API key. Gerenciado por [claude-auth.ts](electron/claude-auth.ts), que dispara um terminal externo para `npm install -g @anthropic-ai/claude-code` e `/login`.
-- **Gemini** ([electron/providers/gemini-provider.ts](electron/providers/gemini-provider.ts)): `@google/genai`, modelo `gemini-3.1-pro-preview` com `thinkingLevel: ThinkingLevel.HIGH`, `temperature: 0.3`. API key vem de `settings:get` (criptografada via `safeStorage` em [settings-store.ts](electron/settings-store.ts)). O ID interno é `gemini-3-1-pro`; valores antigos `gemini-3-pro` em settings/histórico são migrados em runtime ([ModelPicker.tsx](src/components/ModelPicker.tsx) e [translation.ts](src/store/translation.ts)).
+
+Histórico antigo pode conter entradas com `modelId: "gemini-3-pro"` ou `"gemini-3-1-pro"` (provider Gemini foi removido em mai/2026 por conta de cota free zerada do `gemini-3.1-pro-preview`). [HistoryView.tsx](src/components/HistoryView.tsx) ainda mapeia esses IDs para a label histórica; ao "Carregar" uma entrada Gemini, [translation.ts](src/store/translation.ts) força o modelo para Claude.
 
 ### Destaque verde MMC
 

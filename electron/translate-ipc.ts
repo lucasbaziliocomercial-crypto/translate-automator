@@ -1,10 +1,8 @@
 import { ipcMain, BrowserWindow } from "electron";
 import { streamClaudeTranslation } from "./providers/claude-provider";
-import { streamGeminiTranslation } from "./providers/gemini-provider";
-import { loadSettings } from "./settings-store";
 import log from "electron-log/main";
 
-type ModelId = "claude-opus-4-7" | "gemini-3-1-pro";
+type ModelId = "claude-opus-4-7";
 
 interface TranslateRequest {
   jobId: string;
@@ -59,18 +57,6 @@ async function runJob(
   try {
     if (req.modelId === "claude-opus-4-7") {
       for await (const chunk of streamClaudeTranslation({
-        systemPrompt: req.systemPrompt,
-        userPrompt: req.userPrompt,
-        signal: ctrl.signal,
-      })) {
-        send(chunk);
-        if (chunk.type === "done" || chunk.type === "error") return;
-      }
-    } else if (req.modelId === "gemini-3-1-pro") {
-      const settings = loadSettings();
-      const apiKey = settings.geminiApiKey ?? "";
-      for await (const chunk of streamGeminiTranslation({
-        apiKey,
         systemPrompt: req.systemPrompt,
         userPrompt: req.userPrompt,
         signal: ctrl.signal,
