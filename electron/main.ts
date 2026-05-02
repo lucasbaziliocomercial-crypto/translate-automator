@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, Menu, shell } from "electron";
 import * as path from "path";
 import log from "electron-log/main";
 import { setupAutoUpdater } from "./auto-updater";
@@ -9,6 +9,9 @@ import { registerHistoryIpc } from "./history-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerTranslateIpc } from "./translate-ipc";
 
+const APP_NAME = "Translate Automator";
+app.setName(APP_NAME);
+
 log.initialize();
 log.transports.file.level = "info";
 log.transports.file.maxSize = 5 * 1024 * 1024;
@@ -18,6 +21,7 @@ let mainWindow: BrowserWindow | null = null;
 const getMainWindow = () => mainWindow;
 
 const DEV_URL = "http://localhost:5173";
+const isMac = process.platform === "darwin";
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -25,8 +29,10 @@ function createWindow(): void {
     height: 820,
     minWidth: 960,
     minHeight: 640,
-    title: "Translate Automator",
+    title: APP_NAME,
     backgroundColor: "#f8fafc",
+    titleBarStyle: isMac ? "hiddenInset" : "default",
+    trafficLightPosition: isMac ? { x: 16, y: 16 } : undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -72,8 +78,95 @@ function bootIpc(): void {
   registerTranslateIpc(getMainWindow);
 }
 
+function buildAppMenu(): void {
+  const macAppMenu: Electron.MenuItemConstructorOptions = {
+    label: APP_NAME,
+    submenu: [
+      { role: "about" },
+      { type: "separator" },
+      { role: "hide" },
+      { role: "hideOthers" },
+      { role: "unhide" },
+      { type: "separator" },
+      { role: "quit" },
+    ],
+  };
+
+  const fileMenu: Electron.MenuItemConstructorOptions = {
+    label: "File",
+    submenu: isMac ? [{ role: "close" }] : [{ role: "quit" }],
+  };
+
+  const editMenu: Electron.MenuItemConstructorOptions = {
+    label: "Edit",
+    submenu: [
+      { role: "undo" },
+      { role: "redo" },
+      { type: "separator" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "selectAll" },
+    ],
+  };
+
+  const viewMenu: Electron.MenuItemConstructorOptions = {
+    label: "View",
+    submenu: [
+      { role: "reload" },
+      { role: "forceReload" },
+      { role: "toggleDevTools" },
+      { type: "separator" },
+      { role: "resetZoom" },
+      { role: "zoomIn" },
+      { role: "zoomOut" },
+      { type: "separator" },
+      { role: "togglefullscreen" },
+    ],
+  };
+
+  const windowMenu: Electron.MenuItemConstructorOptions = {
+    label: "Window",
+    submenu: isMac
+      ? [
+          { role: "minimize" },
+          { role: "zoom" },
+          { type: "separator" },
+          { role: "front" },
+          { type: "separator" },
+          { role: "window" },
+        ]
+      : [{ role: "minimize" }, { role: "zoom" }, { role: "close" }],
+  };
+
+  const helpMenu: Electron.MenuItemConstructorOptions = {
+    label: "Help",
+    submenu: [
+      {
+        label: "Repositório no GitHub",
+        click: () =>
+          shell.openExternal(
+            "https://github.com/lucasbaziliocomercial-crypto/translate-automator",
+          ),
+      },
+    ],
+  };
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [macAppMenu] : []),
+    fileMenu,
+    editMenu,
+    viewMenu,
+    windowMenu,
+    helpMenu,
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 app.whenReady().then(() => {
   bootIpc();
+  buildAppMenu();
   createWindow();
   setupAutoUpdater(getMainWindow);
 
