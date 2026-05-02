@@ -1,9 +1,26 @@
+import { app } from "electron";
+import * as path from "path";
 import log from "electron-log/main";
 
 export interface ClaudeStreamChunk {
   type: "text" | "done" | "error";
   text?: string;
   error?: string;
+}
+
+// O SDK spawna seu próprio cli.js via `spawn("node", [...])`. Em produção, o
+// default cai em app.asar/, e Node puro não lê dentro de asar — exit code 1.
+// asarUnpack em package.json extrai o pacote pra app.asar.unpacked; aqui
+// reescrevemos o caminho do app pra apontar pro local desempacotado.
+function resolveClaudeCliPath(): string {
+  const base = app.getAppPath().replace(/app\.asar(?=$|[\\/])/, "app.asar.unpacked");
+  return path.join(
+    base,
+    "node_modules",
+    "@anthropic-ai",
+    "claude-agent-sdk",
+    "cli.js",
+  );
 }
 
 export async function* streamClaudeTranslation(args: {
@@ -25,14 +42,19 @@ export async function* streamClaudeTranslation(args: {
     const sdk = await dynamicImport("@anthropic-ai/claude-agent-sdk");
     const { query } = sdk;
 
+    const cliPath = resolveClaudeCliPath();
+    log.info("[claude-provider] pathToClaudeCodeExecutable:", cliPath);
+
     const response = query({
       prompt: userPrompt,
       options: {
         model: "claude-opus-4-7",
+        pathToClaudeCodeExecutable: cliPath,
         systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt },
         permissionMode: "bypassPermissions",
         includePartialMessages: true,
         abortController: signal ? attachSignal(signal) : undefined,
+        stderr: (msg) => log.warn("[claude-provider] cli stderr:", msg.trimEnd()),
       },
     });
 

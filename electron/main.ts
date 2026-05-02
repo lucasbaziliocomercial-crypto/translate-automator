@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -82,6 +82,11 @@ log.transports.file.level = "info";
 log.transports.file.maxSize = 5 * 1024 * 1024;
 Object.assign(console, log.functions);
 log.info("[main] PATH:", process.env.PATH);
+if (process.env.FAKE_PLATFORM) {
+  log.warn(
+    `[main] FAKE_PLATFORM=${process.env.FAKE_PLATFORM} — escopo restrito ao claude-auth (UI nativa segue na plataforma real).`,
+  );
+}
 
 let mainWindow: BrowserWindow | null = null;
 const getMainWindow = () => mainWindow;
@@ -170,6 +175,7 @@ function setupDockIcon(): void {
 }
 
 function bootIpc(): void {
+  ipcMain.handle("app:get-version", () => app.getVersion());
   registerSettingsIpc();
   registerClaudeAuthIpc();
   registerClipboardIpc();
