@@ -1,6 +1,8 @@
 import { app, BrowserWindow, Menu, nativeImage, shell } from "electron";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
+import { execSync } from "child_process";
 import log from "electron-log/main";
 import { setupAutoUpdater } from "./auto-updater";
 import { registerClaudeAuthIpc } from "./claude-auth";
@@ -13,10 +15,73 @@ import { registerTranslateIpc } from "./translate-ipc";
 const APP_NAME = "Translate Automator";
 app.setName(APP_NAME);
 
+// Fix PATH no macOS/Linux quando o app é aberto pelo Finder/Dock.
+// O launchd entrega só `/usr/bin:/bin:/usr/sbin:/sbin`, então `node` e
+// `claude` (instalados em /usr/local/bin, /opt/homebrew/bin ou via NVM)
+// ficam invisíveis e o SDK falha com `spawn node ENOENT`.
+function fixPathForGuiLaunch(): void {
+  if (process.platform === "win32") return;
+
+  const home = os.homedir();
+  const commonPaths = [
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+    "/opt/homebrew/sbin",
+    `${home}/.npm-global/bin`,
+    `${home}/.volta/bin`,
+    `${home}/.bun/bin`,
+    `${home}/.local/bin`,
+  ];
+
+  // NVM: pega todas as versões instaladas
+  try {
+    const nvmDir = `${home}/.nvm/versions/node`;
+    if (fs.existsSync(nvmDir)) {
+      for (const v of fs.readdirSync(nvmDir)) {
+        commonPaths.push(`${nvmDir}/${v}/bin`);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Fallback robusto: se o claude ainda não for encontrado nos paths comuns,
+  // pergunta à shell interativa do usuário qual é o PATH dele de verdade
+  // (cobre asdf, fnm, mise e prefixos customizados).
+  const seed = [...commonPaths, process.env.PATH ?? ""].filter(Boolean).join(":");
+  process.env.PATH = seed;
+
+  const hasClaude = commonPaths.some((p) => {
+    try {
+      return fs.existsSync(`${p}/claude`);
+    } catch {
+      return false;
+    }
+  });
+
+  if (!hasClaude) {
+    try {
+      const userShell = process.env.SHELL ?? "/bin/zsh";
+      const shellPath = execSync(`${userShell} -ilc 'echo -n $PATH'`, {
+        encoding: "utf-8",
+        timeout: 3000,
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+      if (shellPath) {
+        process.env.PATH = `${shellPath}:${process.env.PATH}`;
+      }
+    } catch {
+      // shell interativa pode estar travada por config; segue com o seed
+    }
+  }
+}
+fixPathForGuiLaunch();
+
 log.initialize();
 log.transports.file.level = "info";
 log.transports.file.maxSize = 5 * 1024 * 1024;
 Object.assign(console, log.functions);
+log.info("[main] PATH:", process.env.PATH);
 
 let mainWindow: BrowserWindow | null = null;
 const getMainWindow = () => mainWindow;
