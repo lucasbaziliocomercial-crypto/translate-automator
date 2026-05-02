@@ -139,13 +139,15 @@ function HistoryRow({ entry, onLoad, onDelete }: RowProps) {
   const wordCount = fullText.split(/\s+/).filter(Boolean).length;
   const preview = fullText.slice(0, 180).replace(/\s+/g, " ").trim();
 
+  // Histórico antigo pode conter modelIds de Gemini (3 Pro / 3.1 Pro). O provider
+  // foi removido, mas a label histórica é preservada para identificação da entrada.
   const modelLabel =
-    entry.modelId === "gemini-3-1-pro"
-      ? "Gemini 3.1 Pro"
-      : entry.modelId === "gemini-3-pro"
-        ? "Gemini 3 Pro"
-        : entry.modelId === "claude-opus-4-7"
-          ? "Claude Opus 4.7"
+    entry.modelId === "claude-opus-4-7"
+      ? "Claude Opus 4.7"
+      : entry.modelId === "gemini-3-1-pro"
+        ? "Gemini 3.1 Pro"
+        : entry.modelId === "gemini-3-pro"
+          ? "Gemini 3 Pro"
           : entry.modelId;
 
   return (

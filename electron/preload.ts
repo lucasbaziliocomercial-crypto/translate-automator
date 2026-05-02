@@ -43,7 +43,6 @@ export interface SimpleResult {
 export type ThemePreference = "light" | "dark" | "system";
 
 export interface RendererSettings {
-  hasGeminiKey: boolean;
   lastModelId?: string;
   theme: ThemePreference;
 }
@@ -74,7 +73,6 @@ const api = {
 
   getSettings: (): Promise<RendererSettings> => ipcRenderer.invoke("settings:get"),
   setSettings: (patch: {
-    geminiApiKey?: string;
     lastModelId?: string;
     theme?: ThemePreference;
   }): Promise<RendererSettings> => ipcRenderer.invoke("settings:set", patch),
@@ -94,7 +92,7 @@ const api = {
 
   startTranslation: (req: {
     jobId: string;
-    modelId: "claude-opus-4-7" | "gemini-3-1-pro";
+    modelId: "claude-opus-4-7";
     systemPrompt: string;
     userPrompt: string;
   }): Promise<SimpleResult> => ipcRenderer.invoke("translate:start", req),

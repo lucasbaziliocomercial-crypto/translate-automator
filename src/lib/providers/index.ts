@@ -1,10 +1,10 @@
-export type ModelId = "claude-opus-4-7" | "gemini-3-1-pro";
+export type ModelId = "claude-opus-4-7";
 
 export interface ModelOption {
   id: ModelId;
   label: string;
   description: string;
-  provider: "claude" | "gemini";
+  provider: "claude";
 }
 
 export const MODELS: ModelOption[] = [
@@ -13,12 +13,6 @@ export const MODELS: ModelOption[] = [
     label: "Claude Opus 4.7",
     description: "Anthropic — qualidade máxima (via Claude Max)",
     provider: "claude",
-  },
-  {
-    id: "gemini-3-1-pro",
-    label: "Gemini 3.1 Pro (raciocínio)",
-    description: "Google — modo thinking ligado",
-    provider: "gemini",
   },
 ];
 

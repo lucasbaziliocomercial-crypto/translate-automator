@@ -1,4 +1,4 @@
-import { app, safeStorage } from "electron";
+import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import log from "electron-log/main";
@@ -6,13 +6,11 @@ import log from "electron-log/main";
 export type ThemePreference = "light" | "dark" | "system";
 
 export interface AppSettings {
-  geminiApiKey?: string;
   lastModelId?: string;
   theme?: ThemePreference;
 }
 
 interface DiskShape {
-  geminiApiKeyEncrypted?: string;
   lastModelId?: string;
   theme?: ThemePreference;
 }
@@ -52,14 +50,6 @@ export function loadSettings(): AppSettings {
     lastModelId: disk.lastModelId,
     theme: normalizeTheme(disk.theme),
   };
-  if (disk.geminiApiKeyEncrypted && safeStorage.isEncryptionAvailable()) {
-    try {
-      const buf = Buffer.from(disk.geminiApiKeyEncrypted, "base64");
-      out.geminiApiKey = safeStorage.decryptString(buf);
-    } catch (e) {
-      log.warn("[settings] falha ao descriptografar Gemini key:", e);
-    }
-  }
   cached = out;
   return out;
 }
@@ -72,23 +62,17 @@ export function saveSettings(patch: Partial<AppSettings>): AppSettings {
     lastModelId: merged.lastModelId,
     theme: merged.theme,
   };
-  if (merged.geminiApiKey && safeStorage.isEncryptionAvailable()) {
-    const enc = safeStorage.encryptString(merged.geminiApiKey);
-    disk.geminiApiKeyEncrypted = enc.toString("base64");
-  }
   writeDisk(disk);
   cached = merged;
   return merged;
 }
 
 export function getSettingsForRenderer(): {
-  hasGeminiKey: boolean;
   lastModelId?: string;
   theme: ThemePreference;
 } {
   const s = loadSettings();
   return {
-    hasGeminiKey: Boolean(s.geminiApiKey),
     lastModelId: s.lastModelId,
     theme: s.theme ?? "system",
   };

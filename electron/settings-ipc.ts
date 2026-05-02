@@ -13,7 +13,6 @@ export function registerSettingsIpc(): void {
     (
       _e,
       patch: {
-        geminiApiKey?: string;
         lastModelId?: string;
         theme?: ThemePreference;
       },
