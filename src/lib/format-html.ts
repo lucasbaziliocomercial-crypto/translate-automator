@@ -21,16 +21,18 @@ import {
   MMC_HIGHLIGHT_HEX,
 } from "./highlight-mmc";
 
-const PART_HEADER_RE =
+export const PART_HEADER_RE =
   /^\s*(?:#{1,3}\s+)?(?:\*{1,3}\s*)?(?:[\u{1F4D9}\u{1F4D8}\u{1F4D2}\u{1F4D5}\u{1F4D7}]\s*)?(?:PARTE?|PART)\s+\d+(?:\s*\*{1,3})?\s*$/iu;
 
-const CHAPTER_HEADER_RE =
+export const CHAPTER_HEADER_RE =
   /^\s*(?:#{1,3}\s+)?(?:\*{1,3}\s*)?(Capítulo|Capitulo|Chapter)\s+\d+/iu;
 
-const DIVIDER_RE = /^[_\-—–=]{8,}$/;
+export const DIVIDER_RE = /^[_\-—–=]{8,}$/;
 
-const END_OF_PART_RE =
+export const END_OF_PART_RE =
   /^\s*\*{2,3}\s*(FIM DA PARTE|END OF PART)\s+\d+\s*\*{2,3}\s*$/iu;
+
+export const SPICY_HIGHLIGHT_HEX = "#f4cccc";
 
 interface FormatOptions {
   /** Aplica destaque verde no POV do MMC (default: true). */
@@ -165,8 +167,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
-
-const SPICY_HIGHLIGHT_HEX = "#f4cccc";
 
 function inlineFormat(s: string): string {
   return escapeHtml(s)

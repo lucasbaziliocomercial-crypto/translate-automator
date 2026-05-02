@@ -7,16 +7,35 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on("error", (e) => log.error("[updater] erro:", e));
+  const sendToRenderer = (channel: string, payload: unknown) => {
+    getMainWindow()?.webContents.send(channel, payload);
+  };
+
+  autoUpdater.on("error", (e) => {
+    log.error("[updater] erro:", e);
+    sendToRenderer("updater:error", { message: e?.message ?? String(e) });
+  });
   autoUpdater.on("update-available", (info) => {
     log.info("[updater] update disponível:", info.version);
-    getMainWindow()?.webContents.send("updater:update-available", { version: info.version });
+    sendToRenderer("updater:update-available", { version: info.version });
   });
-  autoUpdater.on("update-not-available", () => {
+  autoUpdater.on("update-not-available", (info) => {
     log.info("[updater] sem updates");
+    sendToRenderer("updater:update-not-available", {
+      currentVersion: info?.version ?? app.getVersion(),
+    });
+  });
+  autoUpdater.on("download-progress", (p) => {
+    sendToRenderer("updater:download-progress", {
+      percent: p.percent,
+      transferred: p.transferred,
+      total: p.total,
+      bytesPerSecond: p.bytesPerSecond,
+    });
   });
   autoUpdater.on("update-downloaded", (info) => {
     log.info("[updater] update baixado:", info.version);
+    sendToRenderer("updater:update-downloaded", { version: info.version });
     const win = getMainWindow();
     if (!win) return;
     dialog
@@ -35,12 +54,20 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   });
 
   ipcMain.handle("updater:check", async () => {
+    if (!app.isPackaged) {
+      return { ok: false, reason: "dev-mode" };
+    }
     try {
       const r = await autoUpdater.checkForUpdates();
       return { ok: true, info: r?.updateInfo };
     } catch (e: any) {
       return { ok: false, reason: e?.message ?? String(e) };
     }
+  });
+
+  ipcMain.handle("updater:quit-and-install", () => {
+    autoUpdater.quitAndInstall();
+    return { ok: true };
   });
 
   if (!app.isPackaged) {

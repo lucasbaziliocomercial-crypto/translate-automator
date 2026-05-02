@@ -40,9 +40,12 @@ export interface SimpleResult {
   reason?: string;
 }
 
+export type ThemePreference = "light" | "dark" | "system";
+
 export interface RendererSettings {
   hasGeminiKey: boolean;
   lastModelId?: string;
+  theme: ThemePreference;
 }
 
 export interface TranslateChunkEvent {
@@ -71,6 +74,7 @@ const api = {
   setSettings: (patch: {
     geminiApiKey?: string;
     lastModelId?: string;
+    theme?: ThemePreference;
   }): Promise<RendererSettings> => ipcRenderer.invoke("settings:set", patch),
 
   writeClipboardHtml: (args: { html: string; text: string }): Promise<SimpleResult> =>
@@ -107,8 +111,52 @@ const api = {
     return () => ipcRenderer.removeListener("updater:update-available", listener);
   },
 
+  onUpdateNotAvailable: (
+    cb: (info: { currentVersion: string }) => void,
+  ): (() => void) => {
+    const listener = (_e: unknown, info: { currentVersion: string }) => cb(info);
+    ipcRenderer.on("updater:update-not-available", listener);
+    return () => ipcRenderer.removeListener("updater:update-not-available", listener);
+  },
+
+  onUpdateDownloadProgress: (
+    cb: (p: {
+      percent: number;
+      transferred: number;
+      total: number;
+      bytesPerSecond: number;
+    }) => void,
+  ): (() => void) => {
+    const listener = (
+      _e: unknown,
+      p: {
+        percent: number;
+        transferred: number;
+        total: number;
+        bytesPerSecond: number;
+      },
+    ) => cb(p);
+    ipcRenderer.on("updater:download-progress", listener);
+    return () => ipcRenderer.removeListener("updater:download-progress", listener);
+  },
+
+  onUpdateDownloaded: (cb: (info: { version: string }) => void): (() => void) => {
+    const listener = (_e: unknown, info: { version: string }) => cb(info);
+    ipcRenderer.on("updater:update-downloaded", listener);
+    return () => ipcRenderer.removeListener("updater:update-downloaded", listener);
+  },
+
+  onUpdateError: (cb: (info: { message: string }) => void): (() => void) => {
+    const listener = (_e: unknown, info: { message: string }) => cb(info);
+    ipcRenderer.on("updater:error", listener);
+    return () => ipcRenderer.removeListener("updater:error", listener);
+  },
+
   checkForUpdates: (): Promise<{ ok: boolean; info?: { version: string }; reason?: string }> =>
     ipcRenderer.invoke("updater:check"),
+
+  quitAndInstall: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke("updater:quit-and-install"),
 };
 
 contextBridge.exposeInMainWorld("translateAutomator", api);
