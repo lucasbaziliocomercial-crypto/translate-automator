@@ -105,7 +105,9 @@ export const useTranslation = create<TranslationState>((set) => ({
 
   loadHistoryEntry: (entry) => {
     const allowedModel: ModelId =
-      entry.modelId === "gemini-3-pro" ? "gemini-3-pro" : "claude-opus-4-7";
+      entry.modelId === "gemini-3-1-pro" || entry.modelId === "gemini-3-pro"
+        ? "gemini-3-1-pro"
+        : "claude-opus-4-7";
     set({
       source: entry.source,
       partResults: entry.partResults,

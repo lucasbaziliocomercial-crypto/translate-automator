@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import log from "electron-log/main";
 
 export interface GeminiStreamChunk {
@@ -28,11 +28,11 @@ export async function* streamGeminiTranslation(args: {
     const ai = new GoogleGenAI({ apiKey });
 
     const stream = await ai.models.generateContentStream({
-      model: "gemini-3-pro",
+      model: "gemini-3.1-pro-preview",
       contents: userPrompt,
       config: {
         systemInstruction: systemPrompt,
-        thinkingConfig: { thinkingBudget: -1 },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
         temperature: 0.3,
       },
     });

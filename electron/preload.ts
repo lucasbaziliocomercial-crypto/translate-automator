@@ -94,7 +94,7 @@ const api = {
 
   startTranslation: (req: {
     jobId: string;
-    modelId: "claude-opus-4-7" | "gemini-3-pro";
+    modelId: "claude-opus-4-7" | "gemini-3-1-pro";
     systemPrompt: string;
     userPrompt: string;
   }): Promise<SimpleResult> => ipcRenderer.invoke("translate:start", req),

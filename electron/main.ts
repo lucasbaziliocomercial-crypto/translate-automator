@@ -31,6 +31,10 @@ function fixPathForGuiLaunch(): void {
     `${home}/.volta/bin`,
     `${home}/.bun/bin`,
     `${home}/.local/bin`,
+    `${home}/.claude/local`, // claude migrate-installer
+    `${home}/.fnm`,
+    `${home}/.asdf/shims`,
+    `${home}/.local/share/mise/shims`,
   ];
 
   // NVM: pega todas as versões instaladas
@@ -45,21 +49,23 @@ function fixPathForGuiLaunch(): void {
     // ignore
   }
 
-  // Fallback robusto: se o claude ainda não for encontrado nos paths comuns,
-  // pergunta à shell interativa do usuário qual é o PATH dele de verdade
-  // (cobre asdf, fnm, mise e prefixos customizados).
+  // Fallback robusto: se `node` ou `claude` ainda não forem encontrados nos
+  // paths comuns, pergunta à shell interativa do usuário qual é o PATH dele
+  // de verdade (cobre asdf, fnm, mise e prefixos customizados). Checamos
+  // ambos porque o SDK precisa de `node` pra spawnar o cli.js.
   const seed = [...commonPaths, process.env.PATH ?? ""].filter(Boolean).join(":");
   process.env.PATH = seed;
 
-  const hasClaude = commonPaths.some((p) => {
-    try {
-      return fs.existsSync(`${p}/claude`);
-    } catch {
-      return false;
-    }
-  });
+  const hasIn = (bin: string) =>
+    commonPaths.some((p) => {
+      try {
+        return fs.existsSync(`${p}/${bin}`);
+      } catch {
+        return false;
+      }
+    });
 
-  if (!hasClaude) {
+  if (!hasIn("node") || !hasIn("claude")) {
     try {
       const userShell = process.env.SHELL ?? "/bin/zsh";
       const shellPath = execSync(`${userShell} -ilc 'echo -n $PATH'`, {

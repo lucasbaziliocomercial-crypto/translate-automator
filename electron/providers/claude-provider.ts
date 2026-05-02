@@ -1,5 +1,7 @@
 import { app } from "electron";
+import * as fs from "fs";
 import * as path from "path";
+import { execFileSync } from "child_process";
 import log from "electron-log/main";
 
 export interface ClaudeStreamChunk {
@@ -8,11 +10,11 @@ export interface ClaudeStreamChunk {
   error?: string;
 }
 
-// O SDK spawna seu próprio cli.js via `spawn("node", [...])`. Em produção, o
-// default cai em app.asar/, e Node puro não lê dentro de asar — exit code 1.
-// asarUnpack em package.json extrai o pacote pra app.asar.unpacked; aqui
-// reescrevemos o caminho do app pra apontar pro local desempacotado.
-function resolveClaudeCliPath(): string {
+// Caminho do cli.js que vem dentro do SDK. Usado como fallback quando
+// não encontramos o `claude` instalado pelo usuário. Em produção, a SDK
+// fica em app.asar.unpacked (asarUnpack no package.json) — sem isso,
+// `spawn("node", [...])` falha porque Node puro não lê dentro de asar.
+function resolveBundledCliPath(): string {
   const base = app.getAppPath().replace(/app\.asar(?=$|[\\/])/, "app.asar.unpacked");
   return path.join(
     base,
@@ -23,12 +25,73 @@ function resolveClaudeCliPath(): string {
   );
 }
 
+// Procura o `claude` instalado pelo usuário (npm-global, brew, native).
+// Preferimos ele porque: (1) é o mesmo binário que fez `/login`, então o
+// ACL da Keychain do macOS bate; (2) está atualizado e conhece modelos
+// novos (Opus 4.7), enquanto o cli.js bundled do SDK fica preso na
+// versão de quando o pacote foi publicado.
+function resolveUserClaudePath(): string | null {
+  // No Windows, `where claude` aponta pro `.cmd`, e o spawn direto sem
+  // shell trava em `.cmd` em algumas versões do Node — fica mais simples
+  // usar o cli.js bundled.
+  if (process.platform === "win32") return null;
+
+  try {
+    const out = execFileSync("which", ["claude"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 3000,
+    })
+      .trim()
+      .split(/\r?\n/)[0]
+      ?.trim();
+    if (out && fs.existsSync(out)) return out;
+  } catch {
+    // ignore: cai pros candidatos abaixo
+  }
+
+  const home = process.env.HOME ?? "";
+  const candidates = [
+    path.join(home, ".claude", "local", "claude"), // claude migrate-installer
+    path.join(home, ".npm-global", "bin", "claude"),
+    "/opt/homebrew/bin/claude",
+    "/usr/local/bin/claude",
+  ];
+  for (const p of candidates) {
+    try {
+      if (p && fs.existsSync(p)) return p;
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+function resolveClaudeCliPath(): { path: string; source: "user-installed" | "bundled" } {
+  const user = resolveUserClaudePath();
+  if (user) return { path: user, source: "user-installed" };
+  return { path: resolveBundledCliPath(), source: "bundled" };
+}
+
 export async function* streamClaudeTranslation(args: {
   systemPrompt: string;
   userPrompt: string;
   signal?: AbortSignal;
 }): AsyncGenerator<ClaudeStreamChunk> {
   const { systemPrompt, userPrompt, signal } = args;
+
+  // Buffer de stderr — quando cli.js sai com código != 0, a SDK só
+  // devolve "Claude Code process exited with code 1" e a causa real
+  // (token expirado, modelo inválido, etc.) fica só no stderr. Anexamos
+  // as últimas linhas no erro retornado pra UI/log mostrarem algo útil.
+  const stderrTail: string[] = [];
+  const pushStderr = (msg: string) => {
+    const trimmed = msg.trimEnd();
+    if (!trimmed) return;
+    stderrTail.push(trimmed);
+    if (stderrTail.length > 30) stderrTail.shift();
+    log.warn("[claude-provider] cli stderr:", trimmed);
+  };
 
   try {
     // Dynamic import: @anthropic-ai/claude-agent-sdk is ESM-only. We use a
@@ -42,19 +105,27 @@ export async function* streamClaudeTranslation(args: {
     const sdk = await dynamicImport("@anthropic-ai/claude-agent-sdk");
     const { query } = sdk;
 
-    const cliPath = resolveClaudeCliPath();
-    log.info("[claude-provider] pathToClaudeCodeExecutable:", cliPath);
+    const cli = resolveClaudeCliPath();
+    log.info(`[claude-provider] cli (${cli.source}):`, cli.path);
 
     const response = query({
       prompt: userPrompt,
       options: {
         model: "claude-opus-4-7",
-        pathToClaudeCodeExecutable: cliPath,
-        systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt },
-        permissionMode: "bypassPermissions",
+        pathToClaudeCodeExecutable: cli.path,
+        // String puro: sem preset "claude_code", que carregaria toda a
+        // infra de tools/agentes/skills. Pra tradução não precisamos disso.
+        systemPrompt,
+        // SDK isolation mode: ignora ~/.claude/settings.json. Evita que
+        // MCP servers/plugins/marketplaces do usuário causem exit 1.
+        settingSources: [],
+        // Sem tools: tradução não precisa de Bash/Read/Edit/etc.
+        tools: [],
+        // Não precisa de bypass — tools desabilitados nem chegam ao
+        // checador de permissões.
         includePartialMessages: true,
         abortController: signal ? attachSignal(signal) : undefined,
-        stderr: (msg) => log.warn("[claude-provider] cli stderr:", msg.trimEnd()),
+        stderr: pushStderr,
       },
     });
 
@@ -69,9 +140,6 @@ export async function* streamClaudeTranslation(args: {
         if (delta.type === "text_delta") {
           yield { type: "text", text: delta.text };
         }
-      } else if (message.type === "assistant") {
-        // No fallback path: when partial messages are not delivered, emit final text once.
-        // (The SDK delivers stream_events when includePartialMessages is true, so this is a safety net.)
       } else if (message.type === "result") {
         yield { type: "done" };
         return;
@@ -81,10 +149,10 @@ export async function* streamClaudeTranslation(args: {
     yield { type: "done" };
   } catch (err: any) {
     log.error("[claude-provider] erro:", err);
-    yield {
-      type: "error",
-      error: err?.message ?? String(err),
-    };
+    const base = err?.message ?? String(err);
+    const tail = stderrTail.slice(-3).filter((s) => s.length > 0);
+    const detail = tail.length > 0 ? ` — ${tail.join(" | ")}` : "";
+    yield { type: "error", error: `${base}${detail}` };
   }
 }
 
