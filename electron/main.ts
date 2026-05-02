@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, shell } from "electron";
 import * as path from "path";
+import * as fs from "fs";
 import log from "electron-log/main";
 import { setupAutoUpdater } from "./auto-updater";
 import { registerClaudeAuthIpc } from "./claude-auth";
@@ -24,6 +25,7 @@ const DEV_URL = "http://localhost:5173";
 const isMac = process.platform === "darwin";
 
 function createWindow(): void {
+  const iconPath = resolveIconPath();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -33,6 +35,7 @@ function createWindow(): void {
     backgroundColor: "#f8fafc",
     titleBarStyle: isMac ? "hiddenInset" : "default",
     trafficLightPosition: isMac ? { x: 16, y: 16 } : undefined,
+    icon: iconPath ?? undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -67,6 +70,38 @@ function createWindow(): void {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+function resolveIconPath(preferPng = false): string | null {
+  const candidates = preferPng
+    ? ["icon.png"]
+    : isMac
+      ? ["icon.icns", "icon.png"]
+      : process.platform === "win32"
+        ? ["icon.ico", "icon.png"]
+        : ["icon.png"];
+  const buildDir = path.join(__dirname, "..", "build");
+  for (const name of candidates) {
+    const p = path.join(buildDir, name);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+function setupDockIcon(): void {
+  if (!isMac || !app.dock) return;
+  const iconPath = resolveIconPath(true);
+  if (!iconPath) {
+    log.warn("[icon] PNG não encontrado em build/");
+    return;
+  }
+  const image = nativeImage.createFromPath(iconPath);
+  if (image.isEmpty()) {
+    log.warn("[icon] nativeImage vazio para", iconPath);
+    return;
+  }
+  app.dock.setIcon(image);
+  log.info("[icon] dock icon aplicado:", iconPath);
 }
 
 function bootIpc(): void {
@@ -165,6 +200,7 @@ function buildAppMenu(): void {
 }
 
 app.whenReady().then(() => {
+  setupDockIcon();
   bootIpc();
   buildAppMenu();
   createWindow();
