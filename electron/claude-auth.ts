@@ -34,8 +34,31 @@ function checkInstalled(): { installed: boolean; version?: string } {
   }
 }
 
+// Claude Code v2.x armazena credenciais no macOS Keychain como
+// "Claude Code-credentials-<hash>", não em ~/.claude/. O `-s` do
+// `security` faz match parcial pelo service name, então o prefixo
+// resolve sem precisar conhecer o sufixo único da instalação.
+function checkLoggedInMacKeychain(): boolean {
+  if (process.platform !== "darwin") return false;
+  try {
+    execFileSync(
+      "security",
+      ["find-generic-password", "-s", "Claude Code-credentials"],
+      { stdio: ["ignore", "ignore", "ignore"], timeout: 5000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getClaudeAuthStatus(): ClaudeAuthStatus {
   const inst = checkInstalled();
+
+  if (checkLoggedInMacKeychain()) {
+    return { ...inst, loggedIn: true, credentialsPath: "macOS Keychain" };
+  }
+
   for (const p of credentialsCandidates()) {
     try {
       if (fs.existsSync(p) && fs.statSync(p).size > 0) {
@@ -214,6 +237,22 @@ export function registerClaudeAuthIpc(): void {
         if (fs.existsSync(p)) {
           fs.unlinkSync(p);
           removed.push(p);
+        }
+      }
+      if (process.platform === "darwin") {
+        try {
+          execFileSync(
+            "security",
+            [
+              "delete-generic-password",
+              "-s",
+              "Claude Code-credentials",
+            ],
+            { stdio: ["ignore", "ignore", "ignore"], timeout: 5000 },
+          );
+          removed.push("macOS Keychain (Claude Code-credentials)");
+        } catch {
+          // sem entry no Keychain - ok
         }
       }
       return { ok: true, removed };
