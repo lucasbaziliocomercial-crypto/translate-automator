@@ -71,36 +71,109 @@ export function getClaudeAuthStatus(): ClaudeAuthStatus {
   return { ...inst, loggedIn: false };
 }
 
+// Instala o Claude CLI sem sudo. Quando o prefix npm padrão é root-owned
+// (caso típico do instalador oficial nodejs.org em /usr/local), reconfigura
+// para ~/.npm-global e adiciona ao rc do shell ativo, idempotente.
+// fixPathForGuiLaunch() em main.ts já cobre ~/.npm-global/bin, então o app
+// encontra o binário em qualquer cold start.
 function writeMacInstallScript(): string {
   const tmp = path.join(
     os.tmpdir(),
     `translate-automator-claude-install-${Date.now()}.sh`,
   );
   const content = `#!/bin/bash
-echo "==> Instalando Claude CLI"
+echo "==> Translate Automator: instalação do Claude CLI"
 echo ""
+
 if ! command -v npm >/dev/null 2>&1; then
-  echo "ERRO: npm nao encontrado."
-  echo "Instale Node.js primeiro: https://nodejs.org/"
-  echo ""
-  read -n 1 -s -r -p "Pressione qualquer tecla para sair..."
+  echo "ERRO: npm não foi encontrado neste Mac."
+  echo "Instale o Node.js primeiro: https://nodejs.org/"
+  echo "Depois clique em 'Instalar Claude CLI' novamente."
+  read -n 1 -s -r -p "Pressione qualquer tecla para fechar..."
   exit 1
 fi
-echo "Pressione qualquer tecla para iniciar a instalacao..."
-read -n 1 -s -r
+
+echo "Node detectado: \$(node --version 2>/dev/null || echo desconhecida)"
+echo "npm  detectado: \$(npm  --version 2>/dev/null || echo desconhecida)"
 echo ""
-npm install -g @anthropic-ai/claude-code
-INSTALL_RESULT=$?
-echo ""
-if [ $INSTALL_RESULT -ne 0 ]; then
-  echo "==> Tentando com sudo (npm global pode pedir senha de admin)..."
-  sudo npm install -g @anthropic-ai/claude-code
+
+CURRENT_PREFIX="\$(npm config get prefix 2>/dev/null | tr -d '[:space:]')"
+echo "Prefix npm atual: \$CURRENT_PREFIX"
+
+PREFIX_USER_OWNED=0
+case "\$CURRENT_PREFIX" in
+  "\$HOME"/.nvm/*|"\$HOME"/.volta/*|"\$HOME"/.asdf/*|"\$HOME"/.fnm/*|"\$HOME"/Library/pnpm*|"\$HOME"/.local/*|"\$HOME"/.npm-global*|"\$HOME"/n/*)
+    PREFIX_USER_OWNED=1 ;;
+esac
+[ -w "\$CURRENT_PREFIX/lib/node_modules" ] 2>/dev/null && PREFIX_USER_OWNED=1
+
+# Cleanup defensivo: tentativas anteriores podem ter deixado lixo
+# em /usr/local/lib/node_modules/@anthropic-ai/.claude-code-XXXXXX
+# (diretório oculto que o npm cria durante o rename).
+rm -rf /usr/local/lib/node_modules/@anthropic-ai/.claude-code-* 2>/dev/null
+rm -rf /opt/homebrew/lib/node_modules/@anthropic-ai/.claude-code-* 2>/dev/null
+
+if [ \$PREFIX_USER_OWNED -eq 0 ]; then
+  echo ""
+  echo "==> O prefix atual não é gravável pelo seu usuário."
+  echo "    Configurando prefix pessoal em ~/.npm-global (sem precisar de senha)."
+  NPM_GLOBAL="\$HOME/.npm-global"
+  mkdir -p "\$NPM_GLOBAL/bin" "\$NPM_GLOBAL/lib"
+  npm config set prefix "\$NPM_GLOBAL"
+
+  RC_MARK="# >>> translate-automator: npm-global PATH >>>"
+  RC_END="# <<< translate-automator: npm-global PATH <<<"
+
+  case "\$(basename "\${SHELL:-/bin/zsh}")" in
+    zsh)  RC_FILES=("\$HOME/.zshrc") ;;
+    bash) RC_FILES=("\$HOME/.bash_profile" "\$HOME/.bashrc") ;;
+    *)    RC_FILES=("\$HOME/.profile") ;;
+  esac
+
+  for RC in "\${RC_FILES[@]}"; do
+    touch "\$RC"
+    if ! grep -qF "\$RC_MARK" "\$RC" 2>/dev/null; then
+      {
+        printf '\\n%s\\n' "\$RC_MARK"
+        printf 'export PATH="%s/bin:\$PATH"\\n' "\$NPM_GLOBAL"
+        printf '%s\\n' "\$RC_END"
+      } >> "\$RC"
+      echo "    + adicionado em \$RC"
+    else
+      echo "    = \$RC já contém o bloco — pulando"
+    fi
+  done
+
+  export PATH="\$NPM_GLOBAL/bin:\$PATH"
 fi
+
 echo ""
-echo "==> Verificando instalacao:"
-claude --version || echo "(claude --version falhou — verifique se npm global bin esta no PATH)"
+echo "==> Instalando @anthropic-ai/claude-code (pode levar 1-2 minutos)..."
+npm install -g @anthropic-ai/claude-code
+RESULT=\$?
+
 echo ""
-echo "Pode fechar esta janela. Volte ao app e clique em 'Verificar'."
+if [ \$RESULT -eq 0 ] && command -v claude >/dev/null 2>&1; then
+  echo "==> Sucesso. Versão instalada:"
+  claude --version
+  echo ""
+  echo "Pode fechar esta janela. Volte ao app e clique em 'Verificar'."
+elif [ \$RESULT -eq 0 ]; then
+  echo "==> Instalação concluída, mas 'claude' ainda não está no PATH desta sessão."
+  echo "    Feche este terminal, abra outro, e clique em 'Verificar' no app."
+else
+  echo "==> A instalação falhou (código \$RESULT)."
+  echo ""
+  echo "Possíveis causas:"
+  echo "  - Sem internet ou registro npm fora do ar"
+  echo "  - Node muito antigo (precisa >= 18). Cheque: node --version"
+  echo "  - Antivírus/MDM bloqueando ~/.npm-global"
+  echo ""
+  echo "Tente rodar manualmente neste terminal:"
+  echo "  npm install -g @anthropic-ai/claude-code"
+fi
+
+echo ""
 read -n 1 -s -r -p "Pressione qualquer tecla para fechar..."
 `;
   fs.writeFileSync(tmp, content, { encoding: "utf-8", mode: 0o755 });
