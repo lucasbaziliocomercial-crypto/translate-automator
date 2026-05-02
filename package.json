@@ -1,7 +1,7 @@
 {
   "name": "translate-automator",
   "productName": "Translate Automator",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Tradutor de roteiros PT-BR para EN-US com Claude Opus 4.7 e Gemini 3 Pro",
   "main": "dist-electron/main.js",
   "author": {
