@@ -9,6 +9,13 @@ html, body, #root {
     Ubuntu, Cantarell, sans-serif;
 }
 
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
 textarea {
   resize: none;
 }
@@ -17,4 +24,12 @@ textarea {
   background-color: #d9ead3;
   padding: 0 2px;
   border-radius: 2px;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

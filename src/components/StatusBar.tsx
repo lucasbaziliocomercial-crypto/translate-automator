@@ -24,33 +24,33 @@ export function StatusBar() {
   }, []);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
       {claudeState === "ready" && (
-        <span className="flex items-center gap-1 text-emerald-700">
+        <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-3.5" />
           Claude conectado
         </span>
       )}
       {claudeState === "needs-login" && (
-        <span className="flex items-center gap-1 text-amber-700">
+        <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
           <AlertCircle className="size-3.5" />
           Claude CLI instalado — falta login
         </span>
       )}
       {claudeState === "missing" && (
-        <span className="flex items-center gap-1 text-rose-700">
+        <span className="flex items-center gap-1 text-rose-700 dark:text-rose-400">
           <AlertCircle className="size-3.5" />
           Claude CLI não instalado
         </span>
       )}
       {updateInfo && (
-        <span className="flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-emerald-800">
+        <span className="flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
           {updateInfo}
         </span>
       )}
       {errorMessage && (
         <span
-          className="flex cursor-pointer items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-rose-800"
+          className="flex cursor-pointer items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
           onClick={() => setError(null)}
           title="Clique para descartar"
         >

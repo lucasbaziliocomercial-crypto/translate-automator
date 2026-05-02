@@ -3,14 +3,18 @@ import * as fs from "fs";
 import * as path from "path";
 import log from "electron-log/main";
 
+export type ThemePreference = "light" | "dark" | "system";
+
 export interface AppSettings {
   geminiApiKey?: string;
   lastModelId?: string;
+  theme?: ThemePreference;
 }
 
 interface DiskShape {
   geminiApiKeyEncrypted?: string;
   lastModelId?: string;
+  theme?: ThemePreference;
 }
 
 let cached: AppSettings | null = null;
@@ -37,10 +41,17 @@ function writeDisk(data: DiskShape): void {
   }
 }
 
+function normalizeTheme(t: unknown): ThemePreference {
+  return t === "light" || t === "dark" || t === "system" ? t : "system";
+}
+
 export function loadSettings(): AppSettings {
   if (cached) return cached;
   const disk = readDisk();
-  const out: AppSettings = { lastModelId: disk.lastModelId };
+  const out: AppSettings = {
+    lastModelId: disk.lastModelId,
+    theme: normalizeTheme(disk.theme),
+  };
   if (disk.geminiApiKeyEncrypted && safeStorage.isEncryptionAvailable()) {
     try {
       const buf = Buffer.from(disk.geminiApiKeyEncrypted, "base64");
@@ -57,7 +68,10 @@ export function saveSettings(patch: Partial<AppSettings>): AppSettings {
   const current = loadSettings();
   const merged: AppSettings = { ...current, ...patch };
 
-  const disk: DiskShape = { lastModelId: merged.lastModelId };
+  const disk: DiskShape = {
+    lastModelId: merged.lastModelId,
+    theme: merged.theme,
+  };
   if (merged.geminiApiKey && safeStorage.isEncryptionAvailable()) {
     const enc = safeStorage.encryptString(merged.geminiApiKey);
     disk.geminiApiKeyEncrypted = enc.toString("base64");
@@ -67,7 +81,15 @@ export function saveSettings(patch: Partial<AppSettings>): AppSettings {
   return merged;
 }
 
-export function getSettingsForRenderer(): { hasGeminiKey: boolean; lastModelId?: string } {
+export function getSettingsForRenderer(): {
+  hasGeminiKey: boolean;
+  lastModelId?: string;
+  theme: ThemePreference;
+} {
   const s = loadSettings();
-  return { hasGeminiKey: Boolean(s.geminiApiKey), lastModelId: s.lastModelId };
+  return {
+    hasGeminiKey: Boolean(s.geminiApiKey),
+    lastModelId: s.lastModelId,
+    theme: s.theme ?? "system",
+  };
 }
