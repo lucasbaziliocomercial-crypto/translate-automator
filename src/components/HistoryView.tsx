@@ -140,11 +140,13 @@ function HistoryRow({ entry, onLoad, onDelete }: RowProps) {
   const preview = fullText.slice(0, 180).replace(/\s+/g, " ").trim();
 
   const modelLabel =
-    entry.modelId === "gemini-3-pro"
-      ? "Gemini 3 Pro"
-      : entry.modelId === "claude-opus-4-7"
-        ? "Claude Opus 4.7"
-        : entry.modelId;
+    entry.modelId === "gemini-3-1-pro"
+      ? "Gemini 3.1 Pro"
+      : entry.modelId === "gemini-3-pro"
+        ? "Gemini 3 Pro"
+        : entry.modelId === "claude-opus-4-7"
+          ? "Claude Opus 4.7"
+          : entry.modelId;
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800/30">

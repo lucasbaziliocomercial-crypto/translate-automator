@@ -4,7 +4,7 @@ import { streamGeminiTranslation } from "./providers/gemini-provider";
 import { loadSettings } from "./settings-store";
 import log from "electron-log/main";
 
-type ModelId = "claude-opus-4-7" | "gemini-3-pro";
+type ModelId = "claude-opus-4-7" | "gemini-3-1-pro";
 
 interface TranslateRequest {
   jobId: string;
@@ -66,7 +66,7 @@ async function runJob(
         send(chunk);
         if (chunk.type === "done" || chunk.type === "error") return;
       }
-    } else if (req.modelId === "gemini-3-pro") {
+    } else if (req.modelId === "gemini-3-1-pro") {
       const settings = loadSettings();
       const apiKey = settings.geminiApiKey ?? "";
       for await (const chunk of streamGeminiTranslation({
