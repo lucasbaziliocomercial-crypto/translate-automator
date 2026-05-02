@@ -10,9 +10,13 @@ App desktop (Mac + Windows) para traduzir roteiros do **PT-BR para EN-US** prese
 ## Setup local
 
 ```bash
+git clone https://github.com/lucasbaziliocomercial-crypto/translate-automator.git
+cd translate-automator
 npm install
 npm run electron:dev
 ```
+
+> **macOS:** o `npm install` roda automaticamente o script `scripts/postinstall.cjs`, que re-assina o Electron baixado com signature ad-hoc e remove a flag de quarentena. Isso evita que o Gatekeeper peça confirmação na primeira execução. Se mesmo assim o sistema bloquear, abra **Configurações do Sistema → Privacidade e Segurança** e clique em "Permitir mesmo assim".
 
 Na primeira abertura:
 
@@ -28,6 +32,24 @@ Pronto — escolha um modelo no topo, importe um `.docx` ou `.pdf`, clique em "T
 npm run package:mac     # gera DMG arm64 + x64 em dist-builder/
 npm run package:win     # gera NSIS instalador em dist-builder/
 ```
+
+### macOS: liberando o `.app` instalado pelo `.dmg` ou `.zip`
+
+Como os builds Mac não são assinados com Apple Developer ID ($99/ano), usuários que baixarem o `.dmg` ou `.zip` de uma release do GitHub vão tropeçar no Gatekeeper. Há duas formas de liberar:
+
+**Opção 1 — via interface (mais simples):**
+
+1. Tente abrir o `Translate Automator.app` normalmente — vai aparecer o aviso "não pode ser aberto".
+2. Vá em **Configurações do Sistema → Privacidade e Segurança**.
+3. Role até embaixo, encontre a mensagem sobre o "Translate Automator" e clique em **"Abrir mesmo assim"**.
+
+**Opção 2 — via terminal (uma linha):**
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Translate Automator.app"
+```
+
+Isso remove a flag de "download não-confiável" que o macOS coloca em apps baixados.
 
 ## Release automática (recomendado)
 
