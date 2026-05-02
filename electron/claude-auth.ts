@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, shell } from "electron";
 import { spawn, execFileSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
@@ -10,6 +10,14 @@ export interface ClaudeAuthStatus {
   loggedIn: boolean;
   credentialsPath?: string;
   version?: string;
+}
+
+// Dev-only: FAKE_PLATFORM permite exercitar os branches Mac/Win sem spoofar
+// process.platform global (que quebra módulos nativos do Electron). Escopo
+// restrito a este arquivo — o restante do app continua na plataforma real.
+function effectivePlatform(): NodeJS.Platform {
+  const fake = process.env.FAKE_PLATFORM as NodeJS.Platform | undefined;
+  return fake ?? process.platform;
 }
 
 function credentialsCandidates(): string[] {
@@ -26,7 +34,7 @@ function checkInstalled(): { installed: boolean; version?: string } {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 5000,
-      shell: process.platform === "win32",
+      shell: effectivePlatform() === "win32",
     });
     return { installed: true, version: out.trim() };
   } catch {
@@ -39,7 +47,7 @@ function checkInstalled(): { installed: boolean; version?: string } {
 // `security` faz match parcial pelo service name, então o prefixo
 // resolve sem precisar conhecer o sufixo único da instalação.
 function checkLoggedInMacKeychain(): boolean {
-  if (process.platform !== "darwin") return false;
+  if (effectivePlatform() !== "darwin") return false;
   try {
     execFileSync(
       "security",
@@ -252,15 +260,24 @@ call claude
 }
 
 function openTerminalWithScript(scriptPath: string): { ok: true } | { ok: false; reason: string } {
+  log.info("[claude-auth] script gerado em:", scriptPath);
+  // Dev: com FAKE_PLATFORM ativo o `open`/`Terminal` do mac e o `cmd /k` real
+  // não existem no SO hospedeiro — abrimos o script no editor padrão pra inspeção.
+  if (process.env.FAKE_PLATFORM) {
+    shell.openPath(scriptPath).then((err) => {
+      if (err) log.warn("[claude-auth] shell.openPath falhou:", err);
+    });
+    return { ok: true };
+  }
   try {
-    if (process.platform === "darwin") {
+    if (effectivePlatform() === "darwin") {
       spawn("open", ["-a", "Terminal", scriptPath], {
         detached: true,
         stdio: "ignore",
       }).unref();
       return { ok: true };
     }
-    if (process.platform === "win32") {
+    if (effectivePlatform() === "win32") {
       spawn("cmd.exe", ["/c", "start", "", "cmd.exe", "/k", scriptPath], {
         detached: true,
         stdio: "ignore",
@@ -280,7 +297,7 @@ export function registerClaudeAuthIpc(): void {
   ipcMain.handle("claude:install", () => {
     try {
       const script =
-        process.platform === "win32"
+        effectivePlatform() === "win32"
           ? writeWindowsInstallScript()
           : writeMacInstallScript();
       return openTerminalWithScript(script);
@@ -293,7 +310,7 @@ export function registerClaudeAuthIpc(): void {
   ipcMain.handle("claude:setup", () => {
     try {
       const script =
-        process.platform === "win32"
+        effectivePlatform() === "win32"
           ? writeWindowsLoginScript()
           : writeMacLoginScript();
       return openTerminalWithScript(script);
@@ -312,7 +329,7 @@ export function registerClaudeAuthIpc(): void {
           removed.push(p);
         }
       }
-      if (process.platform === "darwin") {
+      if (effectivePlatform() === "darwin") {
         try {
           execFileSync(
             "security",

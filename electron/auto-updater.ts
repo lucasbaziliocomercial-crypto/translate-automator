@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import log from "electron-log/main";
 
@@ -36,21 +36,6 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   autoUpdater.on("update-downloaded", (info) => {
     log.info("[updater] update baixado:", info.version);
     sendToRenderer("updater:update-downloaded", { version: info.version });
-    const win = getMainWindow();
-    if (!win) return;
-    dialog
-      .showMessageBox(win, {
-        type: "info",
-        title: "Atualização disponível",
-        message: `Translate Automator v${info.version} foi baixado.`,
-        detail: "Reinicie o app para aplicar.",
-        buttons: ["Reiniciar agora", "Mais tarde"],
-      })
-      .then((r) => {
-        if (r.response === 0) {
-          autoUpdater.quitAndInstall();
-        }
-      });
   });
 
   ipcMain.handle("updater:check", async () => {
@@ -66,8 +51,15 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   });
 
   ipcMain.handle("updater:quit-and-install", () => {
-    autoUpdater.quitAndInstall();
-    return { ok: true };
+    log.info("[updater] quit-and-install solicitado pelo usuário");
+    try {
+      // (isSilent=false, isForceRunAfter=true) — força reabrir o app após instalar.
+      autoUpdater.quitAndInstall(false, true);
+      return { ok: true };
+    } catch (e: any) {
+      log.error("[updater] quitAndInstall falhou:", e);
+      return { ok: false, reason: e?.message ?? String(e) };
+    }
   });
 
   if (!app.isPackaged) {

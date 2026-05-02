@@ -56,6 +56,8 @@ export interface TranslateChunkEvent {
 }
 
 const api = {
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke("app:get-version"),
+
   importFile: (): Promise<ImportResult> => ipcRenderer.invoke("file:import"),
 
   exportFile: (args: {

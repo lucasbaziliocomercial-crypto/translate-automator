@@ -10,6 +10,7 @@ export function StatusBar() {
     "loading" | "missing" | "needs-login" | "ready"
   >("loading");
   const [updateInfo, setUpdateInfo] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
     window.translateAutomator.getClaudeStatus().then((r) => {
@@ -17,6 +18,7 @@ export function StatusBar() {
       else if (!r.loggedIn) setClaudeState("needs-login");
       else setClaudeState("ready");
     });
+    window.translateAutomator.getAppVersion().then(setAppVersion).catch(() => {});
     const off = window.translateAutomator.onUpdateAvailable((info) => {
       setUpdateInfo(`v${info.version} disponível — reinicie para atualizar.`);
     });
@@ -25,6 +27,11 @@ export function StatusBar() {
 
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+      {appVersion && (
+        <span className="text-slate-500 dark:text-slate-500" title="Versão instalada">
+          v{appVersion}
+        </span>
+      )}
       {claudeState === "ready" && (
         <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="size-3.5" />
