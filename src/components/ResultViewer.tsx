@@ -27,7 +27,15 @@ export function ResultViewer({ find }: ResultViewerProps) {
         .sort((a, b) => a - b),
     [partResults],
   );
-  const partsToShow = partsInResult.length > 0 ? partsInResult : [1, 2];
+  // Sempre mostra Parte 1 e Parte 2 (mais quaisquer partes adicionais que existam),
+  // mesmo que partResults tenha só a chave 1. Botão sem conteúdo fica disabled.
+  const partsToShow = useMemo(
+    () =>
+      Array.from(new Set<number>([1, 2, ...partsInResult])).sort(
+        (a, b) => a - b,
+      ),
+    [partsInResult],
+  );
 
   const inProgressParts = useMemo(
     () => new Set(Object.values(jobToPart)),
@@ -72,7 +80,7 @@ export function ResultViewer({ find }: ResultViewerProps) {
         <div className="flex items-center gap-2">
           {partsToShow.map((n) => (
             <div key={n} className="flex items-center gap-1">
-              <CopyPartButton partNumber={n} />
+              <CopyPartButton partNumber={n} maleLeadName={maleLead} />
               {inProgressParts.has(n) && (
                 <span
                   aria-hidden

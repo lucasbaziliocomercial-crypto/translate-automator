@@ -11,7 +11,10 @@
  */
 
 const PART_HEADER_RE =
-  /^\s*(?:#{1,3}\s+)?(?:\*{1,3}\s*)?(?:[\u{1F4D9}\u{1F4D8}\u{1F4D2}\u{1F4D5}\u{1F4D7}]\s*)?(PARTE?|PART)\s+(\d+)(?:\s*\*{1,3})?\s*$/iu;
+  /^\s*(?:#{1,3}\s+)?(?:\*{1,3}\s*)?(?:[\u{1F4D2}-\u{1F4DF}\p{Co}]\s*)?(PARTE?|PART)\s+(\d+)(?:\s*\*{1,3})?\s*$/iu;
+
+const CHAPTER_HEADER_RE =
+  /^\s*(?:#{1,3}\s+)?(?:\*{1,3}\s*)?(CHAPTER|CAP[ÍI]TULO)\s+(\d+)\b.*$/iu;
 
 export interface PartsResult {
   parts: Map<number, string>;
@@ -46,10 +49,34 @@ export function splitByParts(markdown: string): PartsResult {
   }
   flush();
 
+  if (parts.size === 0) {
+    const chapterFallback = splitByChaptersIntoTwo(lines);
+    if (chapterFallback) {
+      return { parts: chapterFallback, preamble: "" };
+    }
+  }
+
   return {
     parts,
     preamble: preambleLines.join("\n").trim(),
   };
+}
+
+function splitByChaptersIntoTwo(lines: string[]): Map<number, string> | null {
+  const chapterLineIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (CHAPTER_HEADER_RE.test(lines[i])) chapterLineIndices.push(i);
+  }
+  if (chapterLineIndices.length < 2) return null;
+
+  const splitIdx = chapterLineIndices[Math.floor(chapterLineIndices.length / 2)];
+  const part1 = lines.slice(0, splitIdx).join("\n").trim() + "\n";
+  const part2 = lines.slice(splitIdx).join("\n").trim() + "\n";
+
+  return new Map([
+    [1, part1],
+    [2, part2],
+  ]);
 }
 
 export function listAvailableParts(markdown: string): number[] {

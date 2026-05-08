@@ -15,7 +15,10 @@
 
 import {
   detectMaleLeadName,
+  findIntimateLineRanges,
   findMmcParagraphLineRanges,
+  INTIMATE_HIGHLIGHT_HEX,
+  isIntimateMarker,
   isLineInRanges,
   isPovHeader,
   MMC_HIGHLIGHT_HEX,
@@ -32,7 +35,7 @@ export const DIVIDER_RE = /^[_\-—–=]{8,}$/;
 export const END_OF_PART_RE =
   /^\s*\*{2,3}\s*(FIM DA PARTE|END OF PART)\s+\d+\s*\*{2,3}\s*$/iu;
 
-export const SPICY_HIGHLIGHT_HEX = "#f4cccc";
+export const SPICY_HIGHLIGHT_HEX = INTIMATE_HIGHLIGHT_HEX;
 
 interface FormatOptions {
   /** Aplica destaque verde no POV do MMC (default: true). */
@@ -65,13 +68,23 @@ export function markdownToRichHtml(
         ? detectMaleLeadName(markdown)
         : null;
   const mmcRanges = maleLead ? findMmcParagraphLineRanges(lines, maleLead) : [];
+  const intimateRanges = findIntimateLineRanges(lines);
 
   const blocks: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    const isHighlight = isLineInRanges(i, mmcRanges);
+
+    if (isIntimateMarker(line)) continue;
+
+    const isIntimate = isLineInRanges(i, intimateRanges);
+    const isMmc = isLineInRanges(i, mmcRanges);
+    const highlightColor = isIntimate
+      ? INTIMATE_HIGHLIGHT_HEX
+      : isMmc
+        ? MMC_HIGHLIGHT_HEX
+        : null;
 
     if (trimmed === "") {
       continue;
@@ -138,14 +151,14 @@ export function markdownToRichHtml(
       );
     } else if (li) {
       const inner = inlineFormat(li[1]);
-      const wrapped = isHighlight
-        ? `<span style="background-color:${MMC_HIGHLIGHT_HEX};">${inner}</span>`
+      const wrapped = highlightColor
+        ? `<span style="background-color:${highlightColor};">${inner}</span>`
         : inner;
       blocks.push(`<li style="${paraStyle}">${wrapped}</li>`);
     } else {
       const inner = inlineFormat(line);
-      const wrapped = isHighlight
-        ? `<span style="background-color:${MMC_HIGHLIGHT_HEX};">${inner}</span>`
+      const wrapped = highlightColor
+        ? `<span style="background-color:${highlightColor};">${inner}</span>`
         : inner;
       blocks.push(`<p style="${paraStyle}">${wrapped}</p>`);
     }
@@ -186,6 +199,7 @@ export function markdownToPlainText(markdown: string, opts?: { skipPartHeader?: 
   const out: string[] = [];
   for (const line of lines) {
     if (skipPart && PART_HEADER_RE.test(line.trim())) continue;
+    if (isIntimateMarker(line)) continue;
     out.push(
       line
         .replace(/==([^=]+?)==/g, "$1")

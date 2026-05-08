@@ -56,16 +56,55 @@ ATENÇÃO ADICIONAL — Formato markdown estruturado:
 
 O input chega em markdown estruturado. Preserve EXATAMENTE estes marcadores no output (apenas o texto entre eles é traduzido):
 
-- Headings: \`# PARTE 1\`, \`## Capítulo 1\`, \`### ✦ Nome\` (ou \`#### ✦ Nome\` para POV masculino) → traduza \`PARTE\` para \`PART\` e \`Capítulo\` para \`Chapter\`, mas mantenha o caractere \`✦\`, os nomes próprios idênticos, e o NÚMERO DE HASHES idêntico (3 hashes ficam 3, 4 ficam 4 — isso identifica FMC vs MMC).
+- Headings: \`# PARTE 1\` → \`# PART 1\`, \`## Capítulo 1\` → \`## Chapter 1\`. Mantenha o caractere \`✦\` e os nomes próprios idênticos.
 - Negrito: \`**texto**\` → \`**translated text**\`
 - Itálico: \`*texto*\` → \`*translated text*\`
 - Listas: \`- item\` ou \`1. item\` → preserve o marcador.
 - Quebras de linha duplas (parágrafos) e simples: preserve idênticas.
 - Linhas em branco: preserve.
 
-⚠️ MARCADORES DE DESTAQUE VERMELHO (cenas íntimas/picantes):
+⚠️ IDENTIFICAÇÃO DE POV (MMC vs FMC) — REGRA OBRIGATÓRIA:
 
-Texto envolvido por \`==...==\` (dois iguais antes e depois) marca cenas íntimas/picantes que ficam destacadas em vermelho na saída final. Você DEVE:
+Identifique pelo contexto qual personagem é o MMC (Male Main Character — POV masculino) e qual é o FMC (Female Main Character — POV feminino). Para CADA cabeçalho de POV no output, use EXATAMENTE esta convenção, INDEPENDENTE do que veio no input:
+
+- \`#### ✦ <Nome MMC>\` (4 hashes) — para POV MASCULINO
+- \`### ✦ <Nome FMC>\` (3 hashes) — para POV FEMININO
+
+Se o input vier sem hashes (ex.: \`✦ KAZIMIR\` ou \`**✦ KAZIMIR**\`), VOCÊ DEVE adicionar os hashes corretos no output. Se o input vier com hashes diferentes, VOCÊ DEVE corrigir para 3 (FMC) ou 4 (MMC). O número de hashes determina qual cor de destaque é aplicada na saída final (verde para MMC).
+
+Exemplos:
+  Input:  \`✦ KAZIMIR\`           (KAZIMIR é o par masculino)    → Output: \`#### ✦ KAZIMIR\`
+  Input:  \`**✦ SAVANNAH**\`      (SAVANNAH é a protagonista)   → Output: \`### ✦ SAVANNAH\`
+  Input:  \`### ✦ VITTORIO\`      (VITTORIO é o vilão masculino) → Output: \`#### ✦ VITTORIO\`
+
+⚠️ MARCADORES DE CENA ÍNTIMA (seção inteira em vermelho):
+
+Quando uma cena íntima começar (sexo, contato físico erótico explícito, masturbação, beijo prolongado com tensão erótica, etc.), insira em uma linha sozinha o marcador \`<<intimate>>\` ANTES do primeiro parágrafo da cena. Quando a cena íntima terminar, insira em uma linha sozinha o marcador \`<</intimate>>\` DEPOIS do último parágrafo. TUDO entre os dois marcadores será pintado de vermelho na saída final.
+
+Regras:
+- Os marcadores \`<<intimate>>\` e \`<</intimate>>\` devem ficar em LINHAS SOZINHAS, nunca no meio de um parágrafo.
+- NUNCA traduza, altere ou remova esses marcadores — copie-os literalmente em inglês mesmo.
+- Use UM PAR de marcadores por cena íntima. Cenas separadas precisam de pares próprios.
+- Se a cena íntima for breve (1 parágrafo só), AINDA assim use um par de marcadores envolvendo o parágrafo.
+
+Exemplo:
+  Input:
+    Ele a puxou contra a parede e a beijou.
+    Suas mãos correram pelo corpo dela enquanto ela arqueava contra ele.
+    A respiração dele queimava em sua nuca.
+    Depois, ela ajeitou o cabelo e saiu sem olhar para trás.
+
+  Output:
+    <<intimate>>
+    He pulled her against the wall and kissed her.
+    His hands ran over her body as she arched against him.
+    His breath burned at the nape of her neck.
+    <</intimate>>
+    Afterward, she fixed her hair and left without looking back.
+
+⚠️ MARCADORES DE DESTAQUE VERMELHO INLINE (frases curtas em qualquer cena):
+
+Texto envolvido por \`==...==\` (dois iguais antes e depois) marca trechos curtos picantes para destaque INLINE em vermelho. Use para frases pontuais que aparecem FORA de uma seção \`<<intimate>>\` (ex.: uma única frase ousada no meio de uma cena de exposição). DENTRO de uma seção \`<<intimate>>\` o destaque já é por seção, então NÃO precisa adicionar \`==\` — apenas preserve os que vierem do input. Você DEVE:
 - NUNCA remover os \`==\` do output.
 - SEMPRE traduzir o texto que está entre os \`==\` e envolvê-lo com os mesmos \`==\` na tradução.
 - Manter o destaque exatamente sobre o mesmo trecho semântico (mesmas frases, na mesma ordem).
@@ -77,7 +116,7 @@ Exemplos:
   Input:  \`==Ele me puxou contra a parede.== Eu não resisti.\`
   Output: \`==He pulled me against the wall.== I didn't resist.\`
 
-Não adicione, remova ou reordene linhas. A contagem de parágrafos do output deve ser igual à do input. A contagem de marcadores \`==\` no output deve ser exatamente igual à do input.`;
+Não adicione, remova ou reordene linhas (com EXCEÇÃO das linhas \`<<intimate>>\` / \`<</intimate>>\` que VOCÊ adiciona ao redor de cenas íntimas). A contagem de marcadores \`==\` no output deve ser exatamente igual à do input.`;
 
 export const TRANSLATOR_USER_PROMPT_PREFIX =
   "Traduza o roteiro abaixo de PT-BR para EN-US, mantendo a formatação markdown linha por linha:\n\n";
