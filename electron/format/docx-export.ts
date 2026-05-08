@@ -10,8 +10,12 @@ import {
 import * as fs from "fs";
 import {
   detectMaleLeadName,
+  findIntimateLineRanges,
   findMmcParagraphLineRanges,
+  INTIMATE_HIGHLIGHT_HEX,
+  isIntimateMarker,
   isLineInRanges,
+  isPovHeader,
   MMC_HIGHLIGHT_HEX,
 } from "./highlight-mmc";
 
@@ -28,25 +32,40 @@ export async function exportMarkdownToDocx(
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const maleLead = detectMaleLeadName(markdown);
   const mmcRanges = maleLead ? findMmcParagraphLineRanges(lines, maleLead) : [];
+  const intimateRanges = findIntimateLineRanges(lines);
 
   const paragraphs: Paragraph[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isHighlight = isLineInRanges(i, mmcRanges);
+
+    if (isIntimateMarker(line)) continue;
+
+    const isIntimate = isLineInRanges(i, intimateRanges);
+    const isMmc = !isIntimate && isLineInRanges(i, mmcRanges);
+    const fillHex = isIntimate
+      ? INTIMATE_HIGHLIGHT_HEX
+      : isMmc
+        ? MMC_HIGHLIGHT_HEX
+        : null;
 
     if (line.trim() === "") {
       paragraphs.push(new Paragraph({}));
       continue;
     }
 
+    const pov = isPovHeader(line);
     const h1 = line.match(/^#\s+(.+)$/);
     const h2 = line.match(/^##\s+(.+)$/);
     const h3 = line.match(/^###\s+(.+)$/);
     const li = line.match(/^[-*]\s+(.+)$/);
     const oli = line.match(/^(\d+)\.\s+(.+)$/);
 
-    if (h1) {
+    if (pov.isPov) {
+      paragraphs.push(
+        buildParagraph(`✦ ${pov.name}`, { heading: HeadingLevel.HEADING_3 }),
+      );
+    } else if (h1) {
       paragraphs.push(buildParagraph(h1[1], { heading: HeadingLevel.HEADING_1 }));
     } else if (h2) {
       paragraphs.push(buildParagraph(h2[1], { heading: HeadingLevel.HEADING_2 }));
@@ -56,18 +75,18 @@ export async function exportMarkdownToDocx(
       paragraphs.push(
         buildParagraph(li[1], {
           bullet: { level: 0 },
-          highlight: isHighlight,
+          fillHex,
         }),
       );
     } else if (oli) {
       paragraphs.push(
         buildParagraph(oli[2], {
           numbering: { reference: "default-numbering", level: 0 },
-          highlight: isHighlight,
+          fillHex,
         }),
       );
     } else {
-      paragraphs.push(buildParagraph(line, { highlight: isHighlight }));
+      paragraphs.push(buildParagraph(line, { fillHex }));
     }
   }
 
@@ -83,7 +102,7 @@ interface ParaOpts {
   heading?: (typeof HeadingLevel)[keyof typeof HeadingLevel];
   bullet?: { level: number };
   numbering?: { reference: string; level: number };
-  highlight?: boolean;
+  fillHex?: string | null;
 }
 
 function buildParagraph(text: string, opts: ParaOpts): Paragraph {
@@ -92,12 +111,12 @@ function buildParagraph(text: string, opts: ParaOpts): Paragraph {
     children: runs,
     ...(opts.heading ? { heading: opts.heading } : {}),
     ...(opts.bullet ? { bullet: opts.bullet } : {}),
-    ...(opts.highlight
+    ...(opts.fillHex
       ? {
           shading: {
             type: ShadingType.CLEAR,
             color: "auto",
-            fill: MMC_HIGHLIGHT_HEX,
+            fill: opts.fillHex,
           },
         }
       : {}),
@@ -105,7 +124,7 @@ function buildParagraph(text: string, opts: ParaOpts): Paragraph {
   return new Paragraph(paraOpts);
 }
 
-const SPICY_HIGHLIGHT_HEX_DOCX = "F4CCCC";
+const SPICY_HIGHLIGHT_HEX_DOCX = INTIMATE_HIGHLIGHT_HEX.toUpperCase();
 
 /**
  * Parseia inline markdown: **bold**, *italic*, ***bolditalic***, ==spicy==.

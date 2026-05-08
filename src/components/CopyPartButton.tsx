@@ -6,9 +6,10 @@ import { markdownToRichHtml, markdownToPlainText } from "@/lib/format-html";
 
 interface Props {
   partNumber: number;
+  maleLeadName?: string | null;
 }
 
-export function CopyPartButton({ partNumber }: Props) {
+export function CopyPartButton({ partNumber, maleLeadName }: Props) {
   const partResults = useTranslation((s) => s.partResults);
   const setError = useTranslation((s) => s.setError);
   const [copied, setCopied] = useState(false);
@@ -18,7 +19,7 @@ export function CopyPartButton({ partNumber }: Props) {
 
   const handleClick = async () => {
     if (disabled || !partContent) return;
-    const html = markdownToRichHtml(partContent);
+    const html = markdownToRichHtml(partContent, { maleLeadName });
     const text = markdownToPlainText(partContent);
     const r = await window.translateAutomator.writeClipboardHtml({ html, text });
     if (!r.ok) {

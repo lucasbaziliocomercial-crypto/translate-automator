@@ -1,7 +1,9 @@
 import { Fragment, type ReactNode } from "react";
 import {
   detectMaleLeadName,
+  findIntimateLineRanges,
   findMmcParagraphLineRanges,
+  isIntimateMarker,
   isLineInRanges,
   isPovHeader,
 } from "./highlight-mmc";
@@ -182,6 +184,7 @@ export function RichRenderer({
         ? detectMaleLeadName(markdown)
         : null;
   const mmcRanges = maleLead ? findMmcParagraphLineRanges(lines, maleLead) : [];
+  const intimateRanges = findIntimateLineRanges(lines);
 
   const trimmedQuery = searchQuery?.trim() ?? "";
   const ctx: SearchCtx | null =
@@ -201,6 +204,7 @@ export function RichRenderer({
     const t = lines[i].trim();
     if (t.length === 0) continue;
     if (skipPartHeader && PART_HEADER_RE.test(t)) continue;
+    if (isIntimateMarker(lines[i])) continue;
     lastRenderableIdx = i;
     break;
   }
@@ -211,8 +215,10 @@ export function RichRenderer({
     const line = lines[i];
     const trimmed = line.trim();
     if (trimmed === "") continue;
+    if (isIntimateMarker(line)) continue;
 
-    const isMmc = isLineInRanges(i, mmcRanges);
+    const isIntimate = isLineInRanges(i, intimateRanges);
+    const isMmc = !isIntimate && isLineInRanges(i, mmcRanges);
     const cursor = showCursor && i === lastRenderableIdx ? <StreamingCursor /> : null;
     const key = `b-${i}`;
 
@@ -330,7 +336,9 @@ export function RichRenderer({
     }
     if (li || ol) {
       const inner = renderInline((li ?? ol)![1], key, ctx);
-      const wrapped = isMmc ? (
+      const wrapped = isIntimate ? (
+        <span className="rounded-sm bg-spicy px-1 dark:bg-spicyDark">{inner}</span>
+      ) : isMmc ? (
         <span className="rounded-sm bg-mmcGreen px-1 dark:bg-mmcGreenDark">{inner}</span>
       ) : (
         inner
@@ -345,7 +353,17 @@ export function RichRenderer({
     }
 
     const inner = renderInline(line, key, ctx);
-    if (isMmc) {
+    if (isIntimate) {
+      blocks.push(
+        <p
+          key={key}
+          className="mb-3 rounded-sm bg-spicy px-1 text-slate-900 dark:bg-spicyDark dark:text-rose-50"
+        >
+          {inner}
+          {cursor}
+        </p>,
+      );
+    } else if (isMmc) {
       blocks.push(
         <p
           key={key}
