@@ -9,6 +9,7 @@ import { TranslateView } from "./components/TranslateView";
 import { HistoryView } from "./components/HistoryView";
 import { useTranslation } from "./store/translation";
 import { useTheme } from "./lib/use-theme";
+import { useUpdaterEvents } from "./lib/use-updater-events";
 import { cn } from "./lib/cn";
 
 type TabId = "translate" | "history";
@@ -17,6 +18,8 @@ export default function App() {
   const [tab, setTab] = useState<TabId>("translate");
   // Inicializa o tema (aplica classe `dark` no <html> conforme settings).
   useTheme();
+  // Registra listeners IPC do auto-updater uma vez (despacha pra useUpdater store).
+  useUpdaterEvents();
 
   const partResults = useTranslation((s) => s.partResults);
   const inProgressCount = useTranslation((s) => s.inProgressCount);
