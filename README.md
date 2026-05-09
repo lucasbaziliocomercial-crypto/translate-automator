@@ -34,21 +34,19 @@ npm run package:win     # gera NSIS instalador em dist-builder/
 
 ### macOS: liberando o `.app` instalado pelo `.dmg` ou `.zip`
 
-Como os builds Mac não são assinados com Apple Developer ID ($99/ano), usuários que baixarem o `.dmg` ou `.zip` de uma release do GitHub vão tropeçar no Gatekeeper. Há duas formas de liberar:
+Como os builds Mac não são assinados com Apple Developer ID ($99/ano), usuários que baixarem o `.dmg` ou `.zip` de uma release do GitHub vão ver "está danificado e não pode ser aberto" ao abrir o app. **Não é dano** — é o Gatekeeper bloqueando porque o app não tem assinatura Apple.
 
-**Opção 1 — via interface (mais simples):**
-
-1. Tente abrir o `Translate Automator.app` normalmente — vai aparecer o aviso "não pode ser aberto".
-2. Vá em **Configurações do Sistema → Privacidade e Segurança**.
-3. Role até embaixo, encontre a mensagem sobre o "Translate Automator" e clique em **"Abrir mesmo assim"**.
-
-**Opção 2 — via terminal (uma linha):**
+A solução é remover a flag de quarentena via Terminal:
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Translate Automator.app"
+xattr -cr "/Applications/Translate Automator.app"
 ```
 
-Isso remove a flag de "download não-confiável" que o macOS coloca em apps baixados.
+> ⚠️ A rota de **Configurações → Privacidade e Segurança → "Abrir mesmo assim"** **não funciona** quando a mensagem do macOS é "está danificado" (versões recentes do macOS — Sonoma+). Esse caminho só ajuda quando aparece "developer cannot be verified". Pra "danificado", **só** o `xattr -cr` resolve.
+
+Atualizações **automáticas** disparadas pelo `electron-updater` (in-app) não passam pelo Gatekeeper — o aviso só aparece em downloads **manuais** via browser. Por isso esse comando só precisa ser rodado uma vez por instalação manual.
+
+📄 Pra entregar ao usuário final (não-dev), passe o link para **[INSTALL-MAC.md](INSTALL-MAC.md)** — tem o passo a passo com Spotlight, instalação no Applications, troubleshooting de DMGs múltiplos montados, etc.
 
 ## Release automática (recomendado)
 
@@ -81,7 +79,7 @@ Os parágrafos sob `### ✦ <MMC>` recebem fundo verde Google Docs (`#d9ead3`) t
 ## Limitações conhecidas
 
 - **PDF preserva pior que DOCX.** PDFs não têm estrutura semântica garantida — a importação extrai texto best-effort, e a exportação cria um PDF novo a partir do markdown traduzido. **Recomendação:** use DOCX como fluxo principal.
-- **Mac não-assinado.** Os builds não passam por code signing — usuários Mac vão precisar de "Botão direito → Abrir" na primeira execução para passar do Gatekeeper.
+- **Mac não-assinado.** Os builds não passam por code signing. Usuários Mac que baixarem o `.dmg` manualmente vão ver "está danificado" e precisam rodar `xattr -cr` no Terminal — ver **[INSTALL-MAC.md](INSTALL-MAC.md)**. Atualizações automáticas in-app não têm esse problema.
 - **Custo.** Claude usa sua assinatura Max (sem cobrança extra por tradução).
 
 ## Estrutura

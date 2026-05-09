@@ -85,7 +85,7 @@ jobs:
             || gh release create "${{ steps.tag.outputs.tag }}" \
                  --repo "${GITHUB_REPOSITORY}" \
                  --title "${{ steps.tag.outputs.tag }}" \
-                 --notes "Auto-generated release for ${{ steps.tag.outputs.tag }}"
+                 --notes-file .github/RELEASE_BODY.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
