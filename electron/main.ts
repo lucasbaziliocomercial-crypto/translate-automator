@@ -182,6 +182,18 @@ function setupDockIcon(): void {
 
 function bootIpc(): void {
   ipcMain.handle("app:get-version", () => app.getVersion());
+  ipcMain.handle("app:open-external-url", async (_e, url: unknown) => {
+    if (typeof url !== "string" || !/^https?:\/\//.test(url)) {
+      return { ok: false, reason: "invalid-url" };
+    }
+    try {
+      await shell.openExternal(url);
+      return { ok: true };
+    } catch (e: any) {
+      log.error("[main] openExternal falhou:", e);
+      return { ok: false, reason: e?.message ?? String(e) };
+    }
+  });
   registerSettingsIpc();
   registerClaudeAuthIpc();
   registerClipboardIpc();

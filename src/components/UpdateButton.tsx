@@ -1,95 +1,69 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { RefreshCw, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { Button } from "./Button";
-
-type Status =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "up-to-date" }
-  | { kind: "available"; version: string }
-  | { kind: "downloading"; percent: number; version?: string }
-  | { kind: "downloaded"; version: string }
-  | { kind: "error"; message: string }
-  | { kind: "dev-disabled" };
+import { useUpdater } from "@/store/updater";
 
 export function UpdateButton() {
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const state = useUpdater((s) => s.state);
+  const setChecking = useUpdater((s) => s.setChecking);
+  const setError = useUpdater((s) => s.setError);
+  const setDevDisabled = useUpdater((s) => s.setDevDisabled);
+  const setIdle = useUpdater((s) => s.setIdle);
   const upToDateTimeout = useRef<number | null>(null);
 
+  // Após mostrar "atualizado" por 3s, volta pra idle pra não poluir o header.
   useEffect(() => {
-    const offs = [
-      window.translateAutomator.onUpdateAvailable(({ version }) => {
-        setStatus({ kind: "available", version });
-      }),
-      window.translateAutomator.onUpdateNotAvailable(() => {
-        setStatus({ kind: "up-to-date" });
-        if (upToDateTimeout.current) {
-          window.clearTimeout(upToDateTimeout.current);
-        }
-        upToDateTimeout.current = window.setTimeout(() => {
-          setStatus({ kind: "idle" });
-          upToDateTimeout.current = null;
-        }, 3000);
-      }),
-      window.translateAutomator.onUpdateDownloadProgress(({ percent }) => {
-        setStatus((prev) => ({
-          kind: "downloading",
-          percent,
-          version: prev.kind === "available" || prev.kind === "downloading"
-            ? prev.version
-            : undefined,
-        }));
-      }),
-      window.translateAutomator.onUpdateDownloaded(({ version }) => {
-        setStatus({ kind: "downloaded", version });
-      }),
-      window.translateAutomator.onUpdateError(({ message }) => {
-        setStatus({ kind: "error", message });
-      }),
-    ];
-    return () => {
-      offs.forEach((off) => off());
+    if (state.kind !== "up-to-date") {
       if (upToDateTimeout.current) {
         window.clearTimeout(upToDateTimeout.current);
+        upToDateTimeout.current = null;
+      }
+      return;
+    }
+    upToDateTimeout.current = window.setTimeout(() => {
+      setIdle();
+      upToDateTimeout.current = null;
+    }, 3000);
+    return () => {
+      if (upToDateTimeout.current) {
+        window.clearTimeout(upToDateTimeout.current);
+        upToDateTimeout.current = null;
       }
     };
-  }, []);
+  }, [state.kind, setIdle]);
 
   const handleClick = async () => {
-    if (status.kind === "downloaded") {
+    if (state.kind === "downloaded") {
       await window.translateAutomator.quitAndInstall();
       return;
     }
     if (
-      status.kind === "checking" ||
-      status.kind === "available" ||
-      status.kind === "downloading" ||
-      status.kind === "dev-disabled"
+      state.kind === "checking" ||
+      state.kind === "downloading" ||
+      state.kind === "dev-disabled"
     ) {
       return;
     }
-    setStatus({ kind: "checking" });
+    setChecking();
     const r = await window.translateAutomator.checkForUpdates();
     if (!r.ok) {
       if (r.reason === "dev-mode") {
-        setStatus({ kind: "dev-disabled" });
+        setDevDisabled();
         return;
       }
-      setStatus({ kind: "error", message: r.reason ?? "Falha ao verificar" });
-      return;
+      setError(r.reason ?? "Falha ao verificar");
     }
-    // Se ok mas nenhum evento chegou ainda, fica em "checking" até evento
-    // update-available ou update-not-available disparar.
+    // Se ok, eventos do updater vão atualizar a store via useUpdaterEvents.
   };
 
-  if (status.kind === "downloaded") {
+  if (state.kind === "downloaded") {
     return (
       <Button
         variant="primary"
         size="sm"
         onClick={handleClick}
-        title={`Reiniciar para instalar v${status.version}`}
-        aria-label={`Reiniciar para instalar v${status.version}`}
+        title={`Reiniciar para instalar v${state.version}`}
+        aria-label={`Reiniciar para instalar v${state.version}`}
       >
         <Download className="size-4" />
         <span>Reiniciar para atualizar</span>
@@ -97,38 +71,22 @@ export function UpdateButton() {
     );
   }
 
-  if (status.kind === "downloading") {
-    const pct = Math.max(0, Math.min(100, Math.round(status.percent)));
+  if (state.kind === "downloading") {
+    const pct = Math.max(0, Math.min(100, Math.round(state.percent)));
     return (
       <Button
         variant="ghost"
         size="sm"
         disabled
-        title={`Baixando atualização — ${pct}%`}
-        aria-label={`Baixando atualização — ${pct}%`}
+        title={`Baixando v${state.version} — ${pct}%`}
+        aria-label={`Baixando v${state.version} — ${pct}%`}
       >
         <RefreshCw className="size-4 animate-spin" />
-        <span>Baixando {pct}%</span>
       </Button>
     );
   }
 
-  if (status.kind === "available") {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled
-        title={`v${status.version} disponível — baixando…`}
-        aria-label={`v${status.version} disponível — baixando`}
-      >
-        <RefreshCw className="size-4 animate-spin" />
-        <span>Baixando…</span>
-      </Button>
-    );
-  }
-
-  if (status.kind === "checking") {
+  if (state.kind === "checking") {
     return (
       <Button
         variant="ghost"
@@ -142,7 +100,7 @@ export function UpdateButton() {
     );
   }
 
-  if (status.kind === "up-to-date") {
+  if (state.kind === "up-to-date") {
     return (
       <Button
         variant="ghost"
@@ -157,13 +115,13 @@ export function UpdateButton() {
     );
   }
 
-  if (status.kind === "error") {
+  if (state.kind === "error") {
     return (
       <Button
         variant="ghost"
         size="sm"
         onClick={handleClick}
-        title={`Erro ao atualizar: ${status.message} — clique para tentar de novo`}
+        title={`Erro ao atualizar: ${state.message} — clique para tentar de novo`}
         aria-label="Erro ao verificar atualizações"
         className="text-amber-700 dark:text-amber-400"
       >
@@ -172,7 +130,7 @@ export function UpdateButton() {
     );
   }
 
-  if (status.kind === "dev-disabled") {
+  if (state.kind === "dev-disabled") {
     return (
       <Button
         variant="ghost"
