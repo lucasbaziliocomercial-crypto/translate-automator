@@ -1,7 +1,7 @@
 {
   "name": "translate-automator",
   "productName": "Translate Automator",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Tradutor de roteiros PT-BR para EN-US com Claude Opus 4.7",
   "main": "dist-electron/main.js",
   "author": {
