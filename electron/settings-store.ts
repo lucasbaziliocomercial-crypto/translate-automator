@@ -8,11 +8,13 @@ export type ThemePreference = "light" | "dark" | "system";
 export interface AppSettings {
   lastModelId?: string;
   theme?: ThemePreference;
+  nativeEnglishEnabled?: boolean;
 }
 
 interface DiskShape {
   lastModelId?: string;
   theme?: ThemePreference;
+  nativeEnglishEnabled?: boolean;
 }
 
 let cached: AppSettings | null = null;
@@ -49,6 +51,7 @@ export function loadSettings(): AppSettings {
   const out: AppSettings = {
     lastModelId: disk.lastModelId,
     theme: normalizeTheme(disk.theme),
+    nativeEnglishEnabled: disk.nativeEnglishEnabled === true,
   };
   cached = out;
   return out;
@@ -61,6 +64,7 @@ export function saveSettings(patch: Partial<AppSettings>): AppSettings {
   const disk: DiskShape = {
     lastModelId: merged.lastModelId,
     theme: merged.theme,
+    nativeEnglishEnabled: merged.nativeEnglishEnabled === true,
   };
   writeDisk(disk);
   cached = merged;
@@ -70,10 +74,12 @@ export function saveSettings(patch: Partial<AppSettings>): AppSettings {
 export function getSettingsForRenderer(): {
   lastModelId?: string;
   theme: ThemePreference;
+  nativeEnglishEnabled: boolean;
 } {
   const s = loadSettings();
   return {
     lastModelId: s.lastModelId,
     theme: s.theme ?? "system",
+    nativeEnglishEnabled: s.nativeEnglishEnabled === true,
   };
 }

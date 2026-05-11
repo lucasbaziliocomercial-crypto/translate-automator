@@ -1,5 +1,7 @@
 import { ipcMain, BrowserWindow } from "electron";
 import { streamClaudeTranslation } from "./providers/claude-provider";
+import { loadPersonalPromptAddendum } from "./personal-prompt";
+import { loadSettings } from "./settings-store";
 import log from "electron-log/main";
 
 type ModelId = "claude-opus-4-7";
@@ -55,9 +57,10 @@ async function runJob(
   };
 
   try {
+    const systemPrompt = await buildSystemPrompt(req.systemPrompt);
     if (req.modelId === "claude-opus-4-7") {
       for await (const chunk of streamClaudeTranslation({
-        systemPrompt: req.systemPrompt,
+        systemPrompt,
         userPrompt: req.userPrompt,
         signal: ctrl.signal,
       })) {
@@ -70,4 +73,12 @@ async function runJob(
   } catch (e: any) {
     send({ type: "error", error: e?.message ?? String(e) });
   }
+}
+
+async function buildSystemPrompt(base: string): Promise<string> {
+  const settings = loadSettings();
+  if (!settings.nativeEnglishEnabled) return base;
+  const addendum = await loadPersonalPromptAddendum();
+  if (!addendum) return base;
+  return `${base}\n\n---\n\n${addendum}`;
 }

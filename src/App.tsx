@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Languages, FileText, History } from "lucide-react";
 import { ModelPicker } from "./components/ModelPicker";
+import { NativeEnglishToggle } from "./components/NativeEnglishToggle";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { StatusBar } from "./components/StatusBar";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -69,6 +70,7 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           <ModelPicker />
+          <NativeEnglishToggle />
           <UpdateButton />
           <ThemeToggle />
           <SettingsDialog />

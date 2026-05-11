@@ -45,6 +45,7 @@ export type ThemePreference = "light" | "dark" | "system";
 export interface RendererSettings {
   lastModelId?: string;
   theme: ThemePreference;
+  nativeEnglishEnabled: boolean;
 }
 
 export interface TranslateChunkEvent {
@@ -78,7 +79,11 @@ const api = {
   setSettings: (patch: {
     lastModelId?: string;
     theme?: ThemePreference;
+    nativeEnglishEnabled?: boolean;
   }): Promise<RendererSettings> => ipcRenderer.invoke("settings:set", patch),
+
+  isPersonalPromptAvailable: (): Promise<boolean> =>
+    ipcRenderer.invoke("personal-prompt:available"),
 
   writeClipboardHtml: (args: { html: string; text: string }): Promise<SimpleResult> =>
     ipcRenderer.invoke("clipboard:write-html", args),
