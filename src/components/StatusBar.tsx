@@ -6,6 +6,14 @@ import { useUpdater } from "@/store/updater";
 const RELEASES_URL =
   "https://github.com/lucasbaziliocomercial-crypto/translate-automator/releases/latest";
 
+// Estado do download manual disparado pelo botão "Baixar v{X} manualmente".
+// Mantido local porque só vive enquanto a status bar está mostrando o erro
+// de auto-update — não precisa virar single source of truth no store global.
+type ManualDownload =
+  | { status: "idle" }
+  | { status: "downloading"; version: string; percent: number }
+  | { status: "error"; version: string; message: string };
+
 export function StatusBar() {
   const errorMessage = useTranslation((s) => s.errorMessage);
   const setError = useTranslation((s) => s.setError);
@@ -15,6 +23,9 @@ export function StatusBar() {
     "loading" | "missing" | "needs-login" | "ready"
   >("loading");
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [manualDownload, setManualDownload] = useState<ManualDownload>({
+    status: "idle",
+  });
 
   useEffect(() => {
     window.translateAutomator.getClaudeStatus().then((r) => {
@@ -24,6 +35,31 @@ export function StatusBar() {
     });
     window.translateAutomator.getAppVersion().then(setAppVersion).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const off = window.translateAutomator.onManualDownloadProgress((p) => {
+      setManualDownload((prev) =>
+        prev.status === "downloading"
+          ? { ...prev, percent: p.percent }
+          : prev,
+      );
+    });
+    return off;
+  }, []);
+
+  const startManualDownload = async (version: string) => {
+    setManualDownload({ status: "downloading", version, percent: 0 });
+    const r = await window.translateAutomator.downloadAndOpenUpdate(version);
+    if (r.ok) {
+      setManualDownload({ status: "idle" });
+    } else {
+      setManualDownload({
+        status: "error",
+        version,
+        message: r.reason ?? "Falha ao baixar.",
+      });
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
@@ -70,20 +106,55 @@ export function StatusBar() {
             <AlertCircle className="size-3.5" />
             Falha ao atualizar: {truncate(updaterState.message, 80)}
           </span>
-          <button
-            type="button"
-            onClick={() => {
-              window.translateAutomator
-                .openExternalUrl(RELEASES_URL)
-                .catch(() => {});
-            }}
-            className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-white hover:bg-emerald-700"
-          >
-            <Download className="size-3.5" />
-            {updaterState.failedVersion
-              ? `Baixar v${updaterState.failedVersion} manualmente`
-              : "Baixar manualmente"}
-          </button>
+
+          {manualDownload.status === "downloading" ? (
+            <span className="flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              <Download className="size-3.5 animate-pulse" />
+              Baixando v{manualDownload.version}… {Math.round(manualDownload.percent)}%
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (updaterState.failedVersion) {
+                  startManualDownload(updaterState.failedVersion).catch(() => {});
+                } else {
+                  window.translateAutomator
+                    .openExternalUrl(RELEASES_URL)
+                    .catch(() => {});
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-white hover:bg-emerald-700"
+            >
+              <Download className="size-3.5" />
+              {updaterState.failedVersion
+                ? `Baixar v${updaterState.failedVersion} agora`
+                : "Baixar manualmente"}
+            </button>
+          )}
+
+          {manualDownload.status === "error" && (
+            <span className="flex flex-wrap items-center gap-2">
+              <span
+                className="flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                title={manualDownload.message}
+              >
+                <AlertCircle className="size-3.5" />
+                Download falhou: {truncate(manualDownload.message, 60)}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  window.translateAutomator
+                    .openExternalUrl(RELEASES_URL)
+                    .catch(() => {});
+                }}
+                className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Abrir GitHub
+              </button>
+            </span>
+          )}
         </span>
       )}
 

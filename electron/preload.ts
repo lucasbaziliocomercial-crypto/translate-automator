@@ -165,6 +165,23 @@ const api = {
 
   quitAndInstall: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke("updater:quit-and-install"),
+
+  downloadAndOpenUpdate: (
+    version: string,
+  ): Promise<{ ok: boolean; path?: string; reason?: string }> =>
+    ipcRenderer.invoke("updater:download-and-open", { version }),
+
+  onManualDownloadProgress: (
+    cb: (p: { percent: number; transferred: number; total: number }) => void,
+  ): (() => void) => {
+    const listener = (
+      _e: unknown,
+      p: { percent: number; transferred: number; total: number },
+    ) => cb(p);
+    ipcRenderer.on("updater:manual-download-progress", listener);
+    return () =>
+      ipcRenderer.removeListener("updater:manual-download-progress", listener);
+  },
 };
 
 contextBridge.exposeInMainWorld("translateAutomator", api);

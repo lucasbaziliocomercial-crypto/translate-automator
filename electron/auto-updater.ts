@@ -1,6 +1,62 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, net, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import log from "electron-log/main";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+const RELEASE_OWNER = "lucasbaziliocomercial-crypto";
+const RELEASE_REPO = "translate-automator";
+
+// Baixa um arquivo via net.request do Electron, seguindo redirects (GitHub
+// releases redireciona pra S3). Reporta progresso por bytes. Sem backpressure
+// explícita — os artifacts são <100MB e cabem confortavelmente no fluxo.
+function downloadFile(
+  url: string,
+  destPath: string,
+  onProgress: (transferred: number, total: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    let settled = false;
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      file.destroy();
+      reject(err);
+    };
+
+    const request = net.request({ url, redirect: "follow" });
+    request.on("response", (response) => {
+      if (response.statusCode !== 200) {
+        fail(
+          new Error(
+            `HTTP ${response.statusCode} ${response.statusMessage ?? ""}`.trim(),
+          ),
+        );
+        return;
+      }
+      const total = Number(response.headers["content-length"]) || 0;
+      let transferred = 0;
+
+      response.on("data", (chunk: Buffer) => {
+        transferred += chunk.length;
+        file.write(chunk);
+        onProgress(transferred, total);
+      });
+      response.on("end", () => {
+        file.end(() => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        });
+      });
+      response.on("error", (err) => fail(err instanceof Error ? err : new Error(String(err))));
+    });
+    request.on("error", (err) => fail(err instanceof Error ? err : new Error(String(err))));
+    file.on("error", (err) => fail(err));
+    request.end();
+  });
+}
 
 export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): void {
   autoUpdater.logger = log;
@@ -97,6 +153,66 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
       return { ok: false, reason: e?.message ?? String(e) };
     }
   });
+
+  // Fallback manual quando o auto-update do electron-updater falha (típico
+  // no Mac sem code-signing, que erra com "Code signature at URL..."). Baixa
+  // direto o DMG (Mac, arch correto) ou o setup .exe (Windows) da release
+  // pra ~/Downloads/ e abre o arquivo — no Mac monta o DMG e o Finder
+  // aparece com a janela de drag-to-install; no Windows roda o instalador.
+  ipcMain.handle(
+    "updater:download-and-open",
+    async (
+      _e,
+      args: { version: string },
+    ): Promise<{ ok: boolean; path?: string; reason?: string }> => {
+      const version = String(args?.version ?? "").trim();
+      if (!version) return { ok: false, reason: "versão inválida" };
+
+      let fileName: string;
+      if (process.platform === "darwin") {
+        const arch = process.arch === "arm64" ? "arm64" : "x64";
+        fileName = `translate-automator-${version}-${arch}-mac.dmg`;
+      } else if (process.platform === "win32") {
+        fileName = `translate-automator-setup-${version}.exe`;
+      } else {
+        return {
+          ok: false,
+          reason: `plataforma não suportada: ${process.platform}`,
+        };
+      }
+
+      const url = `https://github.com/${RELEASE_OWNER}/${RELEASE_REPO}/releases/download/v${version}/${fileName}`;
+      const destPath = path.join(app.getPath("downloads"), fileName);
+
+      log.info(`[updater] download manual: ${url} → ${destPath}`);
+      try {
+        await downloadFile(url, destPath, (transferred, total) => {
+          const percent = total > 0 ? (transferred / total) * 100 : 0;
+          sendToRenderer("updater:manual-download-progress", {
+            percent,
+            transferred,
+            total,
+          });
+        });
+      } catch (e: any) {
+        log.error("[updater] download manual falhou:", e);
+        try {
+          fs.unlinkSync(destPath);
+        } catch {
+          // arquivo pode não existir se falhou antes de criar
+        }
+        return { ok: false, reason: e?.message ?? String(e) };
+      }
+
+      log.info(`[updater] download manual concluído: ${destPath}`);
+      const openErr = await shell.openPath(destPath);
+      if (openErr) {
+        log.error(`[updater] shell.openPath falhou: ${openErr}`);
+        return { ok: false, reason: openErr };
+      }
+      return { ok: true, path: destPath };
+    },
+  );
 
   if (!app.isPackaged) {
     log.info("[updater] dev mode — auto-update desativado");
