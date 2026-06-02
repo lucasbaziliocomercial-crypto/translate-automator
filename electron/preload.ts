@@ -22,6 +22,10 @@ export interface ClaudeStatus {
   loggedIn: boolean;
   credentialsPath?: string;
   version?: string;
+  needsGitBash?: boolean;
+  gitBashPath?: string;
+  needsNode?: boolean;
+  nodePath?: string;
 }
 
 export interface HistoryEntry {
@@ -49,6 +53,13 @@ export interface RendererSettings {
 }
 
 export interface TranslateChunkEvent {
+  jobId: string;
+  type: "text" | "thinking" | "done" | "error";
+  text?: string;
+  error?: string;
+}
+
+export interface ReviewChunkEvent {
   jobId: string;
   type: "text" | "thinking" | "done" | "error";
   text?: string;
@@ -100,7 +111,7 @@ const api = {
 
   startTranslation: (req: {
     jobId: string;
-    modelId: "claude-opus-4-7";
+    modelId: "claude-opus-4-8";
     systemPrompt: string;
     userPrompt: string;
   }): Promise<SimpleResult> => ipcRenderer.invoke("translate:start", req),
@@ -111,6 +122,21 @@ const api = {
     const listener = (_e: unknown, chunk: TranslateChunkEvent) => cb(chunk);
     ipcRenderer.on("translate:chunk", listener);
     return () => ipcRenderer.removeListener("translate:chunk", listener);
+  },
+
+  startReview: (req: {
+    jobId: string;
+    modelId: "claude-opus-4-8";
+    systemPrompt: string;
+    userPrompt: string;
+  }): Promise<SimpleResult> => ipcRenderer.invoke("review:start", req),
+  cancelReview: (jobId: string): Promise<SimpleResult> =>
+    ipcRenderer.invoke("review:cancel", jobId),
+
+  onReviewChunk: (cb: (chunk: ReviewChunkEvent) => void): (() => void) => {
+    const listener = (_e: unknown, chunk: ReviewChunkEvent) => cb(chunk);
+    ipcRenderer.on("review:chunk", listener);
+    return () => ipcRenderer.removeListener("review:chunk", listener);
   },
 
   onUpdateAvailable: (cb: (info: { version: string }) => void): (() => void) => {

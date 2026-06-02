@@ -4,12 +4,18 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import log from "electron-log/main";
+import { ensureGitBashEnv, findGitBashOnWindows } from "./win-bash";
+import { ensureNodeOnPath, findNodeOnWindows } from "./win-node";
 
 export interface ClaudeAuthStatus {
   installed: boolean;
   loggedIn: boolean;
   credentialsPath?: string;
   version?: string;
+  needsGitBash?: boolean;
+  gitBashPath?: string;
+  needsNode?: boolean;
+  nodePath?: string;
 }
 
 // Dev-only: FAKE_PLATFORM permite exercitar os branches Mac/Win sem spoofar
@@ -61,22 +67,38 @@ function checkLoggedInMacKeychain(): boolean {
 }
 
 export function getClaudeAuthStatus(): ClaudeAuthStatus {
+  // Importante: ensureGitBashEnv/ensureNodeOnPath ANTES de checkInstalled.
+  // Versões recentes do claude-code spawnam bash já em `--version`; e a SDK
+  // depende de `node` no PATH. Sem isso, até o probe de versão sai com
+  // erro vermelho e o `installed` seria falsamente reportado como false.
+  const bashPath = ensureGitBashEnv();
+  const nodePath = ensureNodeOnPath();
   const inst = checkInstalled();
 
+  const winExtras =
+    effectivePlatform() === "win32"
+      ? {
+          needsGitBash: !bashPath,
+          gitBashPath: bashPath ?? undefined,
+          needsNode: !nodePath,
+          nodePath: nodePath ?? undefined,
+        }
+      : {};
+
   if (checkLoggedInMacKeychain()) {
-    return { ...inst, loggedIn: true, credentialsPath: "macOS Keychain" };
+    return { ...inst, ...winExtras, loggedIn: true, credentialsPath: "macOS Keychain" };
   }
 
   for (const p of credentialsCandidates()) {
     try {
       if (fs.existsSync(p) && fs.statSync(p).size > 0) {
-        return { ...inst, loggedIn: true, credentialsPath: p };
+        return { ...inst, ...winExtras, loggedIn: true, credentialsPath: p };
       }
     } catch {
       // ignore
     }
   }
-  return { ...inst, loggedIn: false };
+  return { ...inst, ...winExtras, loggedIn: false };
 }
 
 // Instala o Claude CLI sem sudo. Quando o prefix npm padrão é root-owned
@@ -193,8 +215,19 @@ function writeWindowsInstallScript(): string {
     os.tmpdir(),
     `translate-automator-claude-install-${Date.now()}.cmd`,
   );
+  // Propaga o env var pro processo filho `claude` que rodará após o install.
+  // Sem isso, `claude --version` (linha de verificação) sai com o erro
+  // vermelho de git-bash ainda que a instalação npm tenha funcionado.
+  const bashPath = findGitBashOnWindows();
+  const bashLine = bashPath ? `set "CLAUDE_CODE_GIT_BASH_PATH=${bashPath}"\n` : "";
+  // Prepend o diretório do node.exe ao PATH do cmd.exe filho. Cobre o caso
+  // em que o usuário acabou de instalar Node e o cmd.exe novo herdou PATH
+  // antiga — `npm install -g` falharia mesmo com Node instalado.
+  const nodeBin = findNodeOnWindows();
+  const nodeDir = nodeBin ? path.dirname(nodeBin) : null;
+  const pathLine = nodeDir ? `set "PATH=${nodeDir};%PATH%"\n` : "";
   const content = `@echo off
-echo ==^> Instalando Claude CLI
+${bashLine}${pathLine}echo ==^> Instalando Claude CLI
 echo.
 where npm >nul 2>&1
 if errorlevel 1 (
@@ -245,8 +278,13 @@ function writeWindowsLoginScript(): string {
     os.tmpdir(),
     `translate-automator-claude-setup-${Date.now()}.cmd`,
   );
+  const bashPath = findGitBashOnWindows();
+  const bashLine = bashPath ? `set "CLAUDE_CODE_GIT_BASH_PATH=${bashPath}"\n` : "";
+  const nodeBin = findNodeOnWindows();
+  const nodeDir = nodeBin ? path.dirname(nodeBin) : null;
+  const pathLine = nodeDir ? `set "PATH=${nodeDir};%PATH%"\n` : "";
   const content = `@echo off
-echo ==^> Login Claude para Translate Automator
+${bashLine}${pathLine}echo ==^> Login Claude para Translate Automator
 echo.
 echo 1) Quando o Claude abrir, digite /login
 echo 2) Faca o OAuth no navegador.
@@ -296,6 +334,8 @@ export function registerClaudeAuthIpc(): void {
 
   ipcMain.handle("claude:install", () => {
     try {
+      ensureGitBashEnv();
+      ensureNodeOnPath();
       const script =
         effectivePlatform() === "win32"
           ? writeWindowsInstallScript()
@@ -309,6 +349,8 @@ export function registerClaudeAuthIpc(): void {
 
   ipcMain.handle("claude:setup", () => {
     try {
+      ensureGitBashEnv();
+      ensureNodeOnPath();
       const script =
         effectivePlatform() === "win32"
           ? writeWindowsLoginScript()

@@ -83,7 +83,7 @@ export const useTranslation = create<TranslationState>((set) => ({
 
   inProgressCount: 0,
 
-  modelId: "claude-opus-4-7",
+  modelId: "claude-opus-4-8",
   setModelId: (m) => set({ modelId: m }),
 
   sourceFormat: null,
@@ -109,7 +109,7 @@ export const useTranslation = create<TranslationState>((set) => ({
       partResults: entry.partResults,
       sourceName: entry.sourceName,
       sourceFormat: entry.sourceFormat,
-      modelId: "claude-opus-4-7",
+      modelId: "claude-opus-4-8",
       jobToPart: {},
       inProgressCount: 0,
       errorMessage: null,

@@ -5,40 +5,43 @@ import log from "electron-log/main";
 
 type ModelId = "claude-opus-4-8";
 
-interface TranslateRequest {
+interface ReviewRequest {
   jobId: string;
   modelId: ModelId;
   systemPrompt: string;
   userPrompt: string;
 }
 
+// Mapa próprio (independente da tradução) para a revisão poder rodar/cancelar isolada.
 const activeJobs = new Map<string, AbortController>();
 
-export function registerTranslateIpc(getMainWindow: () => BrowserWindow | null): void {
-  ipcMain.handle("translate:start", async (_e, req: TranslateRequest) => {
+export function registerReviewIpc(getMainWindow: () => BrowserWindow | null): void {
+  ipcMain.handle("review:start", async (_e, req: ReviewRequest) => {
     const win = getMainWindow();
     if (!win) return { ok: false, reason: "Janela indisponível" };
     if (activeJobs.has(req.jobId)) {
-      return { ok: false, reason: "Job já em execução" };
+      return { ok: false, reason: "Revisão já em execução" };
     }
     const ctrl = new AbortController();
     activeJobs.set(req.jobId, ctrl);
 
-    runJob(win, req, ctrl).catch((e) => {
-      log.error("[translate] runJob crash:", e);
-      win.webContents.send("translate:chunk", {
-        jobId: req.jobId,
-        type: "error",
-        error: e?.message ?? String(e),
+    runJob(win, req, ctrl)
+      .catch((e) => {
+        log.error("[review] runJob crash:", e);
+        win.webContents.send("review:chunk", {
+          jobId: req.jobId,
+          type: "error",
+          error: e?.message ?? String(e),
+        });
+      })
+      .finally(() => {
+        activeJobs.delete(req.jobId);
       });
-    }).finally(() => {
-      activeJobs.delete(req.jobId);
-    });
 
     return { ok: true };
   });
 
-  ipcMain.handle("translate:cancel", (_e, jobId: string) => {
+  ipcMain.handle("review:cancel", (_e, jobId: string) => {
     const ctrl = activeJobs.get(jobId);
     if (ctrl) ctrl.abort();
     return { ok: true };
@@ -47,12 +50,12 @@ export function registerTranslateIpc(getMainWindow: () => BrowserWindow | null):
 
 async function runJob(
   win: BrowserWindow,
-  req: TranslateRequest,
+  req: ReviewRequest,
   ctrl: AbortController,
 ): Promise<void> {
   const send = (chunk: { type: string; text?: string; error?: string }) => {
     if (win.isDestroyed()) return;
-    win.webContents.send("translate:chunk", { jobId: req.jobId, ...chunk });
+    win.webContents.send("review:chunk", { jobId: req.jobId, ...chunk });
   };
 
   try {

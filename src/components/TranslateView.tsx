@@ -6,6 +6,7 @@ import { Button } from "./Button";
 import { ImportButton } from "./ImportButton";
 import { ExportButton } from "./ExportButton";
 import { TranslateButton } from "./TranslateButton";
+import { ReviewButton } from "./ReviewButton";
 import { SourceEditor } from "./SourceEditor";
 import { ResultViewer } from "./ResultViewer";
 
@@ -58,6 +59,7 @@ export function TranslateView() {
 
       <footer className="flex items-center justify-center gap-6 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
         <TranslateButton />
+        <ReviewButton />
         <ExportButton />
       </footer>
     </div>

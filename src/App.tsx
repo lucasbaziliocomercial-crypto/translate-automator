@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Languages, FileText, History } from "lucide-react";
+import { Languages, FileText, History, Wand2 } from "lucide-react";
 import { ModelPicker } from "./components/ModelPicker";
 import { NativeEnglishToggle } from "./components/NativeEnglishToggle";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -8,12 +8,15 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { UpdateButton } from "./components/UpdateButton";
 import { TranslateView } from "./components/TranslateView";
 import { HistoryView } from "./components/HistoryView";
+import { ReviewPanel } from "./components/ReviewPanel";
 import { useTranslation } from "./store/translation";
+import { useReview } from "./store/review";
+import { useReviewEvents } from "./lib/use-review-events";
 import { useTheme } from "./lib/use-theme";
 import { useUpdaterEvents } from "./lib/use-updater-events";
 import { cn } from "./lib/cn";
 
-type TabId = "translate" | "history";
+type TabId = "translate" | "review" | "history";
 
 export default function App() {
   const [tab, setTab] = useState<TabId>("translate");
@@ -21,6 +24,17 @@ export default function App() {
   useTheme();
   // Registra listeners IPC do auto-updater uma vez (despacha pra useUpdater store).
   useUpdaterEvents();
+  // Listener de chunks da revisão — precisa ficar aqui (sempre montado) porque a
+  // aba troca para Revisão durante o streaming.
+  useReviewEvents();
+
+  // Auto-troca para a aba Revisão quando uma revisão começa (transição false → true).
+  const isReviewing = useReview((s) => s.isReviewing);
+  const prevReviewing = useRef(isReviewing);
+  useEffect(() => {
+    if (!prevReviewing.current && isReviewing) setTab("review");
+    prevReviewing.current = isReviewing;
+  }, [isReviewing]);
 
   const partResults = useTranslation((s) => s.partResults);
   const inProgressCount = useTranslation((s) => s.inProgressCount);
@@ -86,6 +100,13 @@ export default function App() {
           Tradução
         </TabButton>
         <TabButton
+          active={tab === "review"}
+          onClick={() => setTab("review")}
+          icon={<Wand2 className="size-4" />}
+        >
+          Revisão
+        </TabButton>
+        <TabButton
           active={tab === "history"}
           onClick={() => setTab("history")}
           icon={<History className="size-4" />}
@@ -101,6 +122,8 @@ export default function App() {
       <div className="flex-1 overflow-hidden">
         {tab === "translate" ? (
           <TranslateView />
+        ) : tab === "review" ? (
+          <ReviewPanel />
         ) : (
           <HistoryView onLoadedEntry={() => setTab("translate")} />
         )}

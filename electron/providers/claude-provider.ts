@@ -3,6 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "child_process";
 import log from "electron-log/main";
+import { ensureGitBashEnv } from "../win-bash";
+import { ensureNodeOnPath } from "../win-node";
 
 export interface ClaudeStreamChunk {
   type: "text" | "done" | "error";
@@ -28,7 +30,7 @@ function resolveBundledCliPath(): string {
 // Procura o `claude` instalado pelo usuário (npm-global, brew, native).
 // Preferimos ele porque: (1) é o mesmo binário que fez `/login`, então o
 // ACL da Keychain do macOS bate; (2) está atualizado e conhece modelos
-// novos (Opus 4.7), enquanto o cli.js bundled do SDK fica preso na
+// novos (Opus 4.8), enquanto o cli.js bundled do SDK fica preso na
 // versão de quando o pacote foi publicado.
 function resolveUserClaudePath(): string | null {
   // No Windows, `where claude` aponta pro `.cmd`, e o spawn direto sem
@@ -80,6 +82,22 @@ export async function* streamClaudeTranslation(args: {
 }): AsyncGenerator<ClaudeStreamChunk> {
   const { systemPrompt, userPrompt, signal } = args;
 
+  // No Windows a SDK do Claude Code spawna bash.exe internamente — sem
+  // CLAUDE_CODE_GIT_BASH_PATH apontado pro git-bash, o cli.js bundled sai
+  // com "Claude Code on Windows requires git-bash". Chamar aqui é idempotente
+  // (já chamado no boot) e cobre o caso de o usuário ter instalado git-bash
+  // depois do app abrir.
+  ensureGitBashEnv();
+  // Mesma lógica pro node.exe: a SDK faz `spawn('node', [cli.js, ...])` e
+  // depende do diretório do Node estar no PATH do processo Electron.
+  const nodeBin = ensureNodeOnPath();
+  log.info(
+    "[claude-provider] node:",
+    nodeBin ?? "(não detectado)",
+    "| git-bash:",
+    process.env.CLAUDE_CODE_GIT_BASH_PATH ?? "(não setado)",
+  );
+
   // Buffer de stderr — quando cli.js sai com código != 0, a SDK só
   // devolve "Claude Code process exited with code 1" e a causa real
   // (token expirado, modelo inválido, etc.) fica só no stderr. Anexamos
@@ -111,8 +129,12 @@ export async function* streamClaudeTranslation(args: {
     const response = query({
       prompt: userPrompt,
       options: {
-        model: "claude-opus-4-7",
+        model: "claude-opus-4-8",
         pathToClaudeCodeExecutable: cli.path,
+        // Cinto-e-suspensório: a SDK reconstrói env interno em algumas
+        // versões; passando explicitamente garantimos que o PATH enriquecido
+        // por ensureNodeOnPath()/ensureGitBashEnv() chegue ao filho.
+        env: process.env as Record<string, string | undefined>,
         // String puro: sem preset "claude_code", que carregaria toda a
         // infra de tools/agentes/skills. Pra tradução não precisamos disso.
         systemPrompt,
@@ -149,10 +171,15 @@ export async function* streamClaudeTranslation(args: {
     yield { type: "done" };
   } catch (err: any) {
     log.error("[claude-provider] erro:", err);
-    const base = err?.message ?? String(err);
+    const raw = err?.message ?? String(err);
+    // `spawn node ENOENT` é críptico — o usuário fica olhando achando que é
+    // problema do app. Substitui pela causa real e o próximo passo.
+    const friendly = /spawn node ENOENT/i.test(raw)
+      ? `Node.js não foi encontrado. Instale a partir de https://nodejs.org/ e reabra o app. (${raw})`
+      : raw;
     const tail = stderrTail.slice(-3).filter((s) => s.length > 0);
     const detail = tail.length > 0 ? ` — ${tail.join(" | ")}` : "";
-    yield { type: "error", error: `${base}${detail}` };
+    yield { type: "error", error: `${friendly}${detail}` };
   }
 }
 

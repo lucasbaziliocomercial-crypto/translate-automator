@@ -11,6 +11,9 @@ import { registerFileIpc } from "./file-ipc";
 import { registerHistoryIpc } from "./history-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerTranslateIpc } from "./translate-ipc";
+import { registerReviewIpc } from "./review-ipc";
+import { ensureGitBashEnv } from "./win-bash";
+import { ensureNodeOnPath } from "./win-node";
 
 const APP_NAME = "Translate Automator";
 app.setName(APP_NAME);
@@ -88,6 +91,23 @@ log.transports.file.level = "info";
 log.transports.file.maxSize = 5 * 1024 * 1024;
 Object.assign(console, log.functions);
 log.info("[main] PATH:", process.env.PATH);
+
+// Windows: o Claude Code CLI exige bash.exe (git-bash). Populamos o env
+// var no boot pra que tudo (status probe, terminal externo, SDK dentro do
+// app) já encontre. No-op em macOS/Linux.
+ensureGitBashEnv();
+log.info(
+  "[main] CLAUDE_CODE_GIT_BASH_PATH:",
+  process.env.CLAUDE_CODE_GIT_BASH_PATH ?? "(não setado)",
+);
+
+// Windows: a SDK do Claude Agent faz `spawn('node', [cli.js, ...])` sem shell,
+// e nesse modo o libuv só acha `node` se o diretório dele estiver no PATH do
+// processo Electron. Quando o app é lançado pelo atalho do menu Iniciar, esse
+// PATH pode não conter `C:\Program Files\nodejs\`. Prepend agora pra evitar
+// `spawn node ENOENT` na primeira tradução. No-op em macOS/Linux.
+const nodePath = ensureNodeOnPath();
+log.info("[main] node:", nodePath ?? "(não detectado)");
 if (process.env.FAKE_PLATFORM) {
   log.warn(
     `[main] FAKE_PLATFORM=${process.env.FAKE_PLATFORM} — escopo restrito ao claude-auth (UI nativa segue na plataforma real).`,
@@ -200,6 +220,7 @@ function bootIpc(): void {
   registerFileIpc(getMainWindow);
   registerHistoryIpc();
   registerTranslateIpc(getMainWindow);
+  registerReviewIpc(getMainWindow);
 }
 
 function buildAppMenu(): void {

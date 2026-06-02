@@ -7,7 +7,7 @@ export function ModelPicker() {
 
   useEffect(() => {
     window.translateAutomator.getSettings().then((s) => {
-      if (s.lastModelId === "claude-opus-4-7") {
+      if (s.lastModelId === "claude-opus-4-8") {
         setModelId(s.lastModelId);
       }
     });

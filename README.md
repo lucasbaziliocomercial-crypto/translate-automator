@@ -2,7 +2,7 @@
 
 App desktop (Mac + Windows) para traduzir roteiros do **PT-BR para EN-US** preservando a formatação do arquivo original e destacando o POV masculino (MMC) em verde.
 
-- **Modelo:** Claude Opus 4.7 (via assinatura Claude Max).
+- **Modelo:** Claude Opus 4.8 (via assinatura Claude Max).
 - **Formatos:** DOCX e PDF (import e export).
 - **Auto-update:** cada `git push` em `main` gera nova versão automaticamente para Mac e Windows.
 - **Persona:** o tradutor segue à risca o prompt "AGENTE TRADUTOR IMPECÁVEL" (10 regras).

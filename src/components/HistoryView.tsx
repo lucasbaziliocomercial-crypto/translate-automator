@@ -142,13 +142,15 @@ function HistoryRow({ entry, onLoad, onDelete }: RowProps) {
   // Histórico antigo pode conter modelIds de Gemini (3 Pro / 3.1 Pro). O provider
   // foi removido, mas a label histórica é preservada para identificação da entrada.
   const modelLabel =
-    entry.modelId === "claude-opus-4-7"
-      ? "Claude Opus 4.7"
-      : entry.modelId === "gemini-3-1-pro"
-        ? "Gemini 3.1 Pro"
-        : entry.modelId === "gemini-3-pro"
-          ? "Gemini 3 Pro"
-          : entry.modelId;
+    entry.modelId === "claude-opus-4-8"
+      ? "Claude Opus 4.8"
+      : entry.modelId === "claude-opus-4-7"
+        ? "Claude Opus 4.7"
+        : entry.modelId === "gemini-3-1-pro"
+          ? "Gemini 3.1 Pro"
+          : entry.modelId === "gemini-3-pro"
+            ? "Gemini 3 Pro"
+            : entry.modelId;
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800/30">

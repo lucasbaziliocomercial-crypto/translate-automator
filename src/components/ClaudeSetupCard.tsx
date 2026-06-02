@@ -14,6 +14,8 @@ import { Button } from "./Button";
 type Status =
   | { kind: "loading" }
   | { kind: "no-bridge" }
+  | { kind: "needs-node" }
+  | { kind: "needs-git-bash" }
   | { kind: "needs-install" }
   | { kind: "needs-setup"; version?: string }
   | { kind: "opening-terminal"; nextStep: "install" | "login" }
@@ -32,6 +34,22 @@ export function ClaudeSetupCard() {
     }
     try {
       const r = await window.translateAutomator.getClaudeStatus();
+      // No Windows a SDK do Claude faz `spawn('node', ...)` — sem Node.js
+      // instalado, qualquer tentativa de tradução cai em `spawn node ENOENT`.
+      // Tratamos PRIMEIRO porque sem Node nem `claude --version` nem
+      // `npm install` rodam — não adianta seguir pros outros estados.
+      if (r.needsNode) {
+        setState({ kind: "needs-node" });
+        return;
+      }
+      // No Windows o Claude CLI exige bash.exe do Git for Windows. Sem isso,
+      // qualquer probe (`claude --version`, login, tradução) sai com erro
+      // vermelho. Tratamos antes de "needs-install" porque mesmo um CLI
+      // instalado não funciona sem git-bash.
+      if (r.needsGitBash) {
+        setState({ kind: "needs-git-bash" });
+        return;
+      }
       if (!r.installed) {
         setState({ kind: "needs-install" });
         return;
@@ -49,6 +67,14 @@ export function ClaudeSetupCard() {
   useEffect(() => {
     refresh();
   }, []);
+
+  const handleDownloadNode = async () => {
+    await window.translateAutomator.openExternalUrl("https://nodejs.org/");
+  };
+
+  const handleDownloadGitBash = async () => {
+    await window.translateAutomator.openExternalUrl("https://git-scm.com/downloads/win");
+  };
 
   const handleInstall = async () => {
     setState({ kind: "opening-terminal", nextStep: "install" });
@@ -109,7 +135,7 @@ export function ClaudeSetupCard() {
         <div className="flex flex-1 items-center gap-2">
           <CheckCircle2 className="size-4 shrink-0" />
           <div>
-            Conta Claude conectada — pronto para traduzir com Opus 4.7.
+            Conta Claude conectada — pronto para traduzir com Opus 4.8.
             {state.version && (
               <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 font-mono text-xs dark:bg-emerald-900/60">
                 {state.version}
@@ -121,6 +147,60 @@ export function ClaudeSetupCard() {
           <LogOut className="size-3.5" />
           Trocar de conta
         </Button>
+      </div>
+    );
+  }
+
+  if (state.kind === "needs-node") {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+        <div className="mb-2 flex items-center gap-2 text-amber-900 dark:text-amber-200">
+          <Terminal className="size-4" />
+          Node.js não está instalado neste computador.
+        </div>
+        <p className="mb-3 text-xs text-amber-800 dark:text-amber-300">
+          O Claude CLI roda em cima do{" "}
+          <span className="font-mono">node.exe</span>. Baixe o instalador LTS
+          (~30 MB), conclua a instalação com as opções padrão, reabra o app e
+          depois clique em &quot;Verificar&quot;.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" size="sm" onClick={handleDownloadNode}>
+            <Download className="size-3.5" />
+            Baixar Node.js
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh}>
+            <RefreshCw className="size-3.5" />
+            Verificar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.kind === "needs-git-bash") {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+        <div className="mb-2 flex items-center gap-2 text-amber-900 dark:text-amber-200">
+          <Terminal className="size-4" />
+          Git for Windows não está instalado.
+        </div>
+        <p className="mb-3 text-xs text-amber-800 dark:text-amber-300">
+          O Claude CLI no Windows precisa do{" "}
+          <span className="font-mono">bash.exe</span> do Git for Windows. Baixe
+          o instalador (~70 MB), conclua a instalação com as opções padrão e
+          depois clique em &quot;Verificar&quot;.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" size="sm" onClick={handleDownloadGitBash}>
+            <Download className="size-3.5" />
+            Baixar Git for Windows
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh}>
+            <RefreshCw className="size-3.5" />
+            Verificar
+          </Button>
+        </div>
       </div>
     );
   }
@@ -164,7 +244,7 @@ export function ClaudeSetupCard() {
           Claude CLI instalado{state.version && ` (${state.version})`}, mas sem login.
         </div>
         <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
-          Para usar Opus 4.7 sem cobrança de API, conecte sua assinatura Claude Max.
+          Para usar Opus 4.8 sem cobrança de API, conecte sua assinatura Claude Max.
           Vou abrir um terminal externo com o CLI.
         </p>
         <Button variant="primary" size="sm" onClick={handleLogin}>

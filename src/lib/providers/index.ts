@@ -1,4 +1,4 @@
-export type ModelId = "claude-opus-4-7";
+export type ModelId = "claude-opus-4-8";
 
 export interface ModelOption {
   id: ModelId;
@@ -9,8 +9,8 @@ export interface ModelOption {
 
 export const MODELS: ModelOption[] = [
   {
-    id: "claude-opus-4-7",
-    label: "Claude Opus 4.7",
+    id: "claude-opus-4-8",
+    label: "Claude Opus 4.8",
     description: "Anthropic — qualidade máxima (via Claude Max)",
     provider: "claude",
   },
